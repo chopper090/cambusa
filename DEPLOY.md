@@ -5,31 +5,27 @@ installabile (APK / EXE) con PWABuilder e gestire versioni e downgrade.
 
 ---
 
-## 1. Primo deploy su GitHub (una tantum)
+## 1. Pubblicare su GitHub Pages
 
-Apri un terminale **dentro la cartella `FOODCOST/`** ed esegui:
+Il repo è `https://github.com/chopper090/RistoManager` (branch `main` già pushato).
 
-```bash
-# 1. autenticati su GitHub (apre il browser)
-gh auth login
+Per mettere online il sito basta **abilitare Pages una volta** (metodo classico, come note-trainer):
 
-# 2. crea il repo e fai il primo push (il repo locale è già inizializzato con storico e tag)
-gh repo create restaurant-manager --public --source=. --remote=origin --push
+1. Repo **RistoManager → Settings → Pages**
+2. **Build and deployment → Source: _Deploy from a branch_**
+3. **Branch: `main`** · **Folder: `/ (root)`** → **Save**
 
-# 3. abilita GitHub Pages tramite GitHub Actions
-gh repo edit --enable-pages 2>/dev/null || true
-```
-
-Poi, su github.com → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-Al primo push sul branch `main` parte il workflow `Deploy to GitHub Pages` e dopo ~1 minuto
-il sito è online su:
+Dopo ~1 minuto il sito è online su:
 
 ```
-https://<tuo-utente>.github.io/restaurant-manager/
+https://chopper090.github.io/RistoManager/
 ```
 
-> Se preferisci NON usare le Actions: Settings → Pages → Source: *Deploy from a branch* →
-> Branch `main` / `/ (root)`. Il file `.nojekyll` è già presente.
+Il file `.nojekyll` (già presente) fa servire correttamente le cartelle `js/`, `css/`, `icons/`.
+Ogni `git push origin main` successivo aggiorna automaticamente il sito.
+
+> Nota: usiamo il deploy "da branch" (semplice e affidabile) invece del workflow GitHub Actions,
+> esattamente come note-trainer. Resta attivo solo il workflow `release.yml` che crea le Release dai tag.
 
 ---
 
