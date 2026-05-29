@@ -1,0 +1,26 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Claude / dev tooling
+.claude/
+
+# Python cache (per tools/generate_icons.py)
+__pycache__/
+*.pyc
+
+# Build artifacts (eventuali)
+dist/
+build/
+node_modules/
+
+# Backup
+*.bak
+*.tmp

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Restaurant Manager</title>
+<!-- imposta tema PRIMA del CSS per evitare flash -->
+<script>(function(){try{var t=localStorage.getItem('rm:theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="description" content="Gestione foodcost, ricettario, menù e HACCP per ristorazione. Funziona offline.">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#191918">
+<meta name="color-scheme" content="light">
+<meta name="application-name" content="Restaurant Manager">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Restaurant Manager">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div class="brand">
+      <span class="logo">RM</span>
+      <span class="brand-name" id="brand-name">Restaurant Manager</span>
+    </div>
+    <nav>
+      <a href="#dashboard" data-route="dashboard"><span class="nav-ic">◧</span> Dashboard</a>
+      <a href="#ingredienti" data-route="ingredienti"><span class="nav-ic">◇</span> Ingredienti</a>
+      <a href="#piatti" data-route="piatti"><span class="nav-ic">◉</span> Piatti</a>
+      <a href="#ricettario" data-route="ricettario"><span class="nav-ic">▤</span> Ricettario</a>
+      <a href="#menu" data-route="menu"><span class="nav-ic">▦</span> Menù</a>
+      <a href="#haccp" data-route="haccp"><span class="nav-ic">⤳</span> HACCP</a>
+      <a href="#fornitori" data-route="fornitori"><span class="nav-ic">⌂</span> Fornitori</a>
+      <a href="#giacenze" data-route="giacenze"><span class="nav-ic">⊞</span> Giacenze</a>
+      <a href="#ai-menu" data-route="ai-menu"><span class="nav-ic">✦</span> AI Menù <em>beta</em></a>
+    </nav>
+    <div class="side-bottom">
+      <a href="#settings" data-route="settings"><span class="nav-ic">⚙</span> Impostazioni</a>
+      <button id="btn-install" class="btn btn-primary btn-sm" style="display:none">⬇ Installa app</button>
+      <div class="theme-toggle" role="tablist" aria-label="Tema">
+        <button data-theme-set="light" title="Tema chiaro" aria-label="Tema chiaro">☀ Light</button>
+        <button data-theme-set="auto" title="Tema automatico" aria-label="Tema automatico">◐ Auto</button>
+        <button data-theme-set="dark" title="Tema scuro" aria-label="Tema scuro">☾ Dark</button>
+      </div>
+      <div class="io-row">
+        <button id="btn-export-xlsx" class="btn btn-ghost" title="Esporta Excel">↥ Excel</button>
+        <label class="btn btn-ghost" title="Importa Excel">
+          ↧ Excel<input type="file" id="file-import-xlsx" accept=".xlsx,.xls" hidden>
+        </label>
+      </div>
+      <div id="app-version" class="muted" style="font-size:10.5px;text-align:center;padding-top:4px"></div>
+    </div>
+  </aside>
+  <main id="view"></main>
+</div>
+<div id="toast"></div>
+<div id="modal-root"></div>
+
+<!-- Update banner (mostrato dal SW quando arriva una nuova versione) -->
+<div id="update-banner" style="display:none;position:fixed;bottom:18px;right:18px;z-index:9998;background:#191918;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:13px">
+  Nuova versione disponibile. <button id="update-now" style="background:#fff;color:#191918;border:none;border-radius:5px;padding:4px 10px;margin-left:8px;cursor:pointer;font-weight:500">Aggiorna</button>
+</div>
+
+<!-- Librerie esterne (CDN). Per uso completamente offline scarica i file nella cartella vendor/ e cambia gli src. -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<!-- Core: ordine OBBLIGATORIO (version → utils → store → calc → kb → excel/pdf → canvas → moduli → app) -->
+<script src="js/version.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/store.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/kb_prezzi.js"></script>
+<script src="js/excel.js"></script>
+<script src="js/pdf.js"></script>
+<script src="js/canvas_engine.js"></script>
+
+<!-- Moduli -->
+<script src="js/modules/dashboard.js"></script>
+<script src="js/modules/ingredienti.js"></script>
+<script src="js/modules/piatti.js"></script>
+<script src="js/modules/ricettario.js"></script>
+<script src="js/modules/menu.js"></script>
+<script src="js/modules/haccp.js"></script>
+<script src="js/modules/fornitori.js"></script>
+<script src="js/modules/giacenze.js"></script>
+<script src="js/modules/menu_editor.js"></script>
+<script src="js/modules/ricettario_editor.js"></script>
+<script src="js/modules/ai-menu.js"></script>
+<script src="js/modules/settings.js"></script>
+
+<script src="js/app.js"></script>
+
+<!-- Service Worker (registrato solo su http(s)://, ignorato su file://) -->
+<script>
+if('serviceWorker' in navigator && (location.protocol==='https:' || location.protocol==='http:')){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').then(reg=>{
+      reg.addEventListener('updatefound', ()=>{
+        const nw = reg.installing;
+        if(!nw) return;
+        nw.addEventListener('statechange', ()=>{
+          if(nw.state==='installed' && navigator.serviceWorker.controller){
+            const b = document.getElementById('update-banner');
+            if(b){
+              b.style.display='block';
+              document.getElementById('update-now').onclick=()=>{ nw.postMessage('skipWaiting'); location.reload(); };
+            }
+          }
+        });
+      });
+    }).catch(e=>console.warn('SW registration failed', e));
+  });
+}
+</script>
+</body>
+</html>

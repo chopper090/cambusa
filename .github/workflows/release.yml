@@ -1,0 +1,31 @@
+name: Release
+
+# Crea una GitHub Release ogni volta che pushi un tag tipo v1.4.0.
+# Serve da storico ufficiale e permette il downgrade scaricando una versione precedente.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Restaurant Manager ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            Release automatica di **${{ github.ref_name }}**.
+            Vedi `CHANGELOG.md` per i dettagli.
+
+            **Downgrade**: per tornare a questa versione →
+            `git checkout ${{ github.ref_name }}`

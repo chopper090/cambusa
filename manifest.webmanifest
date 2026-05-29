@@ -1,0 +1,48 @@
+{
+  "name": "Restaurant Manager",
+  "short_name": "RM",
+  "version": "1.4.0",
+  "id": "restaurant-manager",
+  "description": "Gestione foodcost, ricettario, menù e HACCP per ristorazione. Funziona offline.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "it",
+  "dir": "ltr",
+  "background_color": "#ffffff",
+  "theme_color": "#191918",
+  "categories": ["food", "business", "productivity"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Nuovo piatto",       "short_name": "Piatti",      "url": "./index.html#piatti",      "icons": [{"src":"icons/icon-192.png","sizes":"192x192"}] },
+    { "name": "Ingredienti",        "short_name": "Ingredienti", "url": "./index.html#ingredienti", "icons": [{"src":"icons/icon-192.png","sizes":"192x192"}] },
+    { "name": "Ricettario",         "short_name": "Ricettario",  "url": "./index.html#ricettario",  "icons": [{"src":"icons/icon-192.png","sizes":"192x192"}] },
+    { "name": "HACCP",              "short_name": "HACCP",       "url": "./index.html#haccp",       "icons": [{"src":"icons/icon-192.png","sizes":"192x192"}] }
+  ]
+}
