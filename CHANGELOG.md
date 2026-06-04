@@ -9,6 +9,11 @@ versioni secondo [Semantic Versioning](https://semver.org/lang/it/): `MAJOR.MINO
 - **PATCH (zz)**: correzioni di bug e ritocchi.
 
 ## [Unreleased]
+
+## [1.4.1] - 2026-06-04
+### Modificato
+- _descrivi qui le modifiche_
+
 ### Da fare
 - (vedi `MIGLIORIE.md` per la roadmap)
 
