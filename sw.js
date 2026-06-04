@@ -1,8 +1,8 @@
-// Restaurant Manager — Service Worker
+// Cambusa — Service Worker
 // Strategia: app shell precaching (cache-first per i propri file) + network-first per le CDN esterne.
 // Aggiorna CACHE_VERSION quando rilasci nuove versioni dell'app.
 
-const CACHE_VERSION = 'rm-v1.4.0';
+const CACHE_VERSION = 'cambusa-v1.4.0';
 const SHELL_CACHE  = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 

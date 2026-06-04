@@ -1,4 +1,4 @@
-# Restaurant Manager
+# Cambusa
 
 App offline-first per la gestione di un ristorante: **food cost**, **ricettario**, **menù**, **HACCP**, fornitori, giacenze. Esporta tutto in **Excel** e **PDF**, con editor di impaginazione stile Canva. Stack: HTML + CSS + vanilla JS (zero build, zero framework).
 

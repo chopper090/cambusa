@@ -1,8 +1,8 @@
 {
-  "name": "Restaurant Manager",
-  "short_name": "RM",
+  "name": "Cambusa",
+  "short_name": "Cambusa",
   "version": "1.4.0",
-  "id": "restaurant-manager",
+  "id": "cambusa",
   "description": "Gestione foodcost, ricettario, menù e HACCP per ristorazione. Funziona offline.",
   "start_url": "./index.html",
   "scope": "./",
