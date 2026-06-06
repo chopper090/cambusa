@@ -52,9 +52,51 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', ()=>{
   // no-op: il CSS @media gestisce il caso "data-theme assente"
 });
 
-// header nome locale
-const s = store.getSettings();
-if(s.nome_locale) $('#brand-name').textContent = s.nome_locale;
+// ===== Ristorante attivo: skin + switcher in sidebar =====
+function paintActive(){
+  const r = store.getActive();
+  if(!r) return;
+  RM.clients.apply(r);
+  const nameEl = $('#brand-name'); if(nameEl) nameEl.textContent = r.name || 'Cambusa';
+  const kindEl = $('#brand-kind'); if(kindEl) kindEl.textContent = [r.kind, r.place].filter(Boolean).join(' · ');
+  const logoEl = $('#brand-logo');
+  if(logoEl){
+    if(r.logo){
+      logoEl.textContent = '';
+      logoEl.style.backgroundImage = `url(${r.logo})`;
+      logoEl.classList.add('has-img');
+    } else {
+      logoEl.style.backgroundImage = '';
+      logoEl.classList.remove('has-img');
+      logoEl.textContent = RM.clients.initials(r.name);
+    }
+  }
+  buildSwitch();
+}
+function buildSwitch(){
+  const sel = $('#rest-switch'); if(!sel) return;
+  const rs = store.getRestaurants(), act = store.getActiveId();
+  sel.innerHTML = '';
+  for(const r of rs){
+    const o = document.createElement('option');
+    o.value = r.id; o.textContent = r.name; o.selected = r.id===act;
+    sel.appendChild(o);
+  }
+}
+const switchEl = $('#rest-switch');
+if(switchEl){
+  switchEl.addEventListener('change', e=>{
+    if(store.setActive(e.target.value)){
+      const cur = currentRoute();
+      // l'editor menù è legato a un id specifico: torna alla lista evitando stati incoerenti
+      if(cur==='menu-editor' || cur==='ricettario-editor') location.hash = '#dashboard';
+      else mount(cur);
+    }
+  });
+}
+// re-skin + aggiorna switcher quando cambia il registro/ristorante attivo
+RM.onChange(k=>{ if(k==='__app__') paintActive(); });
+paintActive();
 
 // versione in sidebar
 const verEl = $('#app-version');

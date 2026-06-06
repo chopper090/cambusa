@@ -331,3 +331,71 @@ hr.sep{border:none;border-top:1px solid var(--border);margin:20px 0}
 /* === SKELETON / LOADING === */
 .skel{background:linear-gradient(90deg,var(--hover) 0%,var(--hover-strong) 50%,var(--hover) 100%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius-sm)}
 @keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+
+/* === MULTI-RISTORANTE: sidebar switcher + brand === */
+#sidebar a.brand{cursor:pointer;text-decoration:none;transition:background var(--t-fast)}
+#sidebar a.brand:hover{background:var(--hover)}
+#sidebar .brand-meta{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+#sidebar .brand-kind{font-size:10.5px;color:var(--text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sidebar .brand .logo.has-img{background-size:cover;background-position:center;color:transparent;font-size:0}
+.rest-switch-row{display:flex;gap:6px;align-items:center;padding:0 4px}
+.rest-switch{
+  flex:1;min-width:0;font-size:12.5px;padding:6px 8px;border-radius:var(--radius-sm);
+  background:var(--bg-elev);color:var(--text);border:1px solid var(--border);cursor:pointer;
+  transition:border-color var(--t-fast);
+}
+.rest-switch:hover{border-color:var(--border-2)}
+
+/* === Pagina Ristoranti === */
+.rest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.rest-card{padding:0;overflow:hidden;display:flex;flex-direction:column;gap:0;transition:box-shadow var(--t),border-color var(--t),transform var(--t-fast)}
+.rest-card:hover{box-shadow:var(--shadow);border-color:var(--border-2)}
+.rest-card.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset, var(--shadow)}
+.rest-card-bar{height:6px;width:100%}
+.rest-card-head{display:flex;align-items:center;gap:12px;padding:16px 16px 6px}
+.rest-logo{
+  width:46px;height:46px;border-radius:10px;flex-shrink:0;
+  display:grid;place-items:center;font-weight:700;font-size:15px;letter-spacing:-.02em;
+  background-size:cover;background-position:center;box-shadow:var(--shadow-sm);
+}
+.rest-logo.lg{width:64px;height:64px;border-radius:12px;font-size:20px}
+.rest-name{font-size:17px;font-weight:600;line-height:1.15;letter-spacing:-.01em;overflow-wrap:anywhere}
+.rest-sub{font-size:12px;color:var(--text-3);margin-top:2px}
+.rest-swatches{display:flex;gap:5px;padding:6px 16px 2px}
+.rest-swatches .sw{width:22px;height:22px;border-radius:5px;border:1px solid var(--border-2)}
+.rest-card-meta{display:flex;flex-wrap:wrap;gap:6px;padding:8px 16px}
+.rest-card-actions{display:flex;align-items:center;gap:6px;padding:10px 16px 16px;margin-top:auto;border-top:1px solid var(--border)}
+
+/* === Editor ristorante: preset, anteprima === */
+.lbl{font-size:12px;color:var(--text-2);font-weight:600;letter-spacing:.02em;text-transform:uppercase}
+.rest-editor{gap:22px;align-items:start}
+.theme-swatches{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}
+.theme-swatch{
+  display:flex;flex-direction:column;gap:5px;align-items:center;padding:7px 9px;border-radius:var(--radius);
+  background:var(--bg-elev);border:1.5px solid var(--border);cursor:pointer;transition:all var(--t-fast);min-width:64px;
+}
+.theme-swatch:hover{border-color:var(--border-2)}
+.theme-swatch.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.theme-swatch .ts-colors{display:flex;gap:2px}
+.theme-swatch .ts-colors i{width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.08)}
+.theme-swatch .ts-label{font-size:11px;color:var(--text-2);font-weight:500}
+.rest-advanced{margin-top:12px;border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;background:var(--side)}
+.rest-advanced>summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-2)}
+.rest-advanced[open]>summary{margin-bottom:6px}
+
+.rest-preview-wrap{position:sticky;top:0}
+.rest-preview{
+  border-radius:var(--radius);padding:22px 24px;box-shadow:var(--shadow);
+  border:1px solid var(--border-2);min-height:240px;
+}
+.rest-preview .rp-name{font-size:30px;font-weight:700;line-height:1.05;text-align:center}
+.rest-preview .rp-stamp{font-size:12px;text-align:center;margin-top:4px;letter-spacing:.04em}
+.rest-preview .rp-rule{width:80px;height:2px;margin:14px auto}
+.rest-preview .rp-cat{font-size:16px;font-weight:700;text-align:center;margin:6px 0 10px;letter-spacing:.02em}
+.rest-preview .rp-dish{margin-bottom:10px}
+.rest-preview .rp-dish-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:14px}
+.rest-preview .rp-dish-desc{font-size:11.5px;font-style:italic;margin-top:1px}
+@media (max-width:880px){
+  #sidebar .brand-meta{display:none}
+  .rest-switch-row{flex:1}
+}

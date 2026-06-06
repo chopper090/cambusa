@@ -102,9 +102,17 @@ function mount(root){
   }
   refreshBrandingPickers();
 
+  const active = store.getActive();
   root.innerHTML='';
   root.append(
     el('div',{class:'view-head'},[el('h1',{text:'Impostazioni'})]),
+    el('div',{class:'view-sub'},[
+      'Queste impostazioni valgono per il ristorante attivo: ',
+      el('b',{text:active?.name||'—'}),
+      '. Per gestire più locali e il loro stile (logo, palette, font) vai su ',
+      el('a',{href:'#ristoranti',style:{color:'var(--accent)',fontWeight:'600'},text:'Ristoranti'}),
+      '.',
+    ]),
     el('div',{class:'card'},[
       el('h2',{text:'Locale'}),
       el('div',{class:'grid-2'},[
@@ -143,15 +151,14 @@ function mount(root){
           foodcost_target_pct:parseFloat(fFc.value)||30,
           backup_ogni_n_modifiche:parseInt(fBackup.value)||25,
         });
-        const brand = document.getElementById('brand-name');
-        if(brand) brand.textContent = fNome.value.trim() || 'Restaurant Manager';
         toast('Impostazioni salvate','ok');
       }}),
       el('div',{class:'spacer'}),
-      el('button',{class:'btn btn-danger',text:'Azzera tutti i dati',onclick:async()=>{
-        if(!await confirmDialog('Sei sicuro? Verranno cancellati ingredienti, piatti, menù, HACCP, loghi. Operazione irreversibile.','Azzera tutto')) return;
+      el('button',{class:'btn btn-danger',text:'Azzera dati di questo ristorante',onclick:async()=>{
+        const nm = store.getActive()?.name || 'questo ristorante';
+        if(!await confirmDialog(`Sei sicuro? Verranno cancellati ingredienti, piatti, menù, HACCP e loghi di “${nm}”. Gli altri ristoranti non saranno toccati. Operazione irreversibile.`,'Azzera tutto')) return;
         store.resetAll();
-        toast('Tutti i dati azzerati','ok');
+        toast('Dati del ristorante azzerati','ok');
         location.hash='#dashboard';
       }})
     ])

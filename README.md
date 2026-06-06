@@ -1,11 +1,20 @@
 # Cambusa
 
-App offline-first per la gestione di un ristorante: **food cost**, **ricettario**, **menù**, **HACCP**, fornitori, giacenze. Esporta tutto in **Excel** e **PDF**, con editor di impaginazione stile Canva. Stack: HTML + CSS + vanilla JS (zero build, zero framework).
+App offline-first per la gestione di uno o più ristoranti: **multi-ristorante** (consulenza), **food cost**, **ricettario**, **menù**, **HACCP**, fornitori, giacenze. Esporta tutto in **Excel** e **PDF**, con editor di impaginazione stile Canva. Stack: HTML + CSS + vanilla JS (zero build, zero framework).
 
 Funziona aperta da doppio click (`index.html`) e come **PWA installabile** (APK / EXE via PWABuilder) quando deployata su GitHub Pages.
 
 > **Deploy, versioni, branch e downgrade**: vedi **[DEPLOY.md](DEPLOY.md)**.
 > **Storico modifiche**: vedi **[CHANGELOG.md](CHANGELOG.md)**. Versione corrente in `VERSION`.
+
+## Multi-ristorante (consulenza)
+
+Dalla sezione **Ristoranti** gestisci più locali da un'unica app — il tuo, *il baretto*, e altri ancora. Ogni ristorante ha:
+
+- **dati propri e separati**: ingredienti, piatti, menù, HACCP, fornitori, giacenze e impostazioni;
+- **stile proprio**: logo, palette e font, con preset pronti (*Classico*, *il baretto*, *Elegante*, *Mediterraneo*, *Minimal*) o personalizzazione completa, con anteprima live.
+
+Lo **switcher** in alto nella barra laterale cambia al volo il ristorante attivo: l'app si "veste" del suo stile e i **menù esportati** ereditano font, colori e decori (es. prezzi stile bar `| 8,00 €` e onde/agrumi per *il baretto*). I dati già presenti vengono migrati automaticamente nel ristorante predefinito senza perdite.
 
 ## Avvio rapido (locale)
 

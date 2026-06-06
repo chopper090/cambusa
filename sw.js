@@ -2,7 +2,7 @@
 // Strategia: app shell precaching (cache-first per i propri file) + network-first per le CDN esterne.
 // Aggiorna CACHE_VERSION quando rilasci nuove versioni dell'app.
 
-const CACHE_VERSION = 'cambusa-v1.4.1';
+const CACHE_VERSION = 'cambusa-v1.5.0';
 const SHELL_CACHE  = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 
@@ -15,6 +15,7 @@ const SHELL = [
   './css/theme.css',
   './css/components.css',
   './js/utils.js',
+  './js/clients.js',
   './js/store.js',
   './js/calc.js',
   './js/kb_prezzi.js',
@@ -22,6 +23,7 @@ const SHELL = [
   './js/pdf.js',
   './js/canvas_engine.js',
   './js/app.js',
+  './js/modules/restaurants.js',
   './js/modules/dashboard.js',
   './js/modules/ingredienti.js',
   './js/modules/piatti.js',

@@ -10,6 +10,17 @@ versioni secondo [Semantic Versioning](https://semver.org/lang/it/): `MAJOR.MINO
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-06-06
+### Aggiunto
+- **Multi-ristorante (consulenza)**: nuova sezione **Ristoranti** per gestire più locali da un'unica app (il tuo, *il baretto*, e altri). Ogni ristorante ha i propri dati (ingredienti, piatti, menù, HACCP, impostazioni) e il proprio **stile**.
+- **Stile per ristorante**: logo, palette e font con preset pronti (*Classico*, *il baretto*, *Elegante*, *Mediterraneo*, *Minimal*) oppure personalizzazione completa di colori e font, con **anteprima live** del menù.
+- **Switcher in sidebar** per cambiare al volo il ristorante attivo; l'app (accento, logo, nome) si "veste" di conseguenza.
+- I **menù generati** ereditano lo stile del ristorante attivo (font titoli/corpo, colori, prezzi in stile bar `| 8,00 €` e decori "mare/agrumi" per *il baretto*).
+- Tema *il baretto*: titoli condensati (Bebas Neue), palette navy/azzurro/arancio; aggiunti i font Bebas Neue, Jost, Oswald.
+### Modificato
+- I dati ora sono **partizionati per ristorante**. I dati esistenti vengono migrati automaticamente nel ristorante "Il mio ristorante" (copia non distruttiva: i dati originali non vengono cancellati).
+- **Impostazioni** ora valgono per il ristorante attivo; l'azzeramento dati agisce solo sul locale corrente.
+
 ## [1.4.1] - 2026-06-04
 ### Modificato
 - _descrivi qui le modifiche_
