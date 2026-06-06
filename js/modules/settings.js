@@ -2,7 +2,7 @@
 'use strict';
 const RM = window.RM = window.RM || {};
 RM.modules = RM.modules || {};
-const {el, toast, confirmDialog, uid} = RM.utils;
+const {el, toast, confirmDialog, uid, downloadBlob, fmtDate} = RM.utils;
 const {store} = RM;
 
 function mount(root){
@@ -13,6 +13,20 @@ function mount(root){
   const fIva   = el('input',{type:'number',min:'0',max:'100',step:'0.5',value:s.iva_default||10});
   const fFc    = el('input',{type:'number',min:'5',max:'80',step:'0.5',value:s.foodcost_target_pct||30});
   const fBackup= el('input',{type:'number',min:'1',step:'1',value:s.backup_ogni_n_modifiche||25});
+
+  // === BACKUP COMPLETO (tutti i ristoranti) ===
+  const fRestore = el('input',{type:'file',accept:'.json,application/json',hidden:true});
+  fRestore.addEventListener('change', async e=>{
+    const f = e.target.files?.[0]; fRestore.value='';
+    if(!f) return;
+    let data; try{ data = JSON.parse(await f.text()); }catch{ toast('File non valido','err'); return; }
+    if(!data || data._fmt!=='cambusa-backup'){ toast('Non è un backup di Cambusa','err'); return; }
+    const n = (data.app?.restaurants||[]).length;
+    const when = data.savedAt ? fmtDate(data.savedAt) : '?';
+    if(!await confirmDialog(`Ripristinare il backup (${n} ristorante${n===1?'':'i'}, del ${when})? TUTTI i dati attuali verranno sostituiti. Operazione irreversibile.`,'Ripristina')) return;
+    if(store.restore(data)){ toast('Backup ripristinato','ok'); setTimeout(()=>location.reload(),400); }
+    else toast('Ripristino fallito','err');
+  });
 
   // === LOGHI MULTIPLI ===
   const logosBox = el('div',{class:'list'});
@@ -140,6 +154,19 @@ function mount(root){
         el('div',{class:'field'},[el('label',{text:'Target food cost %'}),fFc,
           el('span',{class:'hint',text:'Tipico ristorazione: 25-35%.'})]),
         el('div',{class:'field'},[el('label',{text:'Backup auto ogni N modifiche'}),fBackup]),
+      ]),
+    ]),
+    el('div',{class:'card',style:{marginTop:'14px'}},[
+      el('h2',{text:'Backup completo'}),
+      el('p',{class:'muted',style:{marginBottom:'12px',fontSize:'12.5px'},text:'Salva o ripristina TUTTI i ristoranti e i loro dati in un unico file .json. Utile per spostare il lavoro su un altro dispositivo o tenere una copia di sicurezza.'}),
+      el('div',{class:'row',style:{gap:'10px',flexWrap:'wrap'}},[
+        el('button',{class:'btn btn-primary',text:'↥ Esporta backup (.json)',onclick:()=>{
+          const data = store.backup();
+          const blob = new Blob([JSON.stringify(data)],{type:'application/json'});
+          downloadBlob(blob, `cambusa-backup-${new Date().toISOString().slice(0,10)}.json`);
+          toast('Backup esportato','ok');
+        }}),
+        el('label',{class:'btn',text:'↧ Importa backup'},[fRestore]),
       ]),
     ]),
     el('div',{class:'row',style:{marginTop:'18px'}},[

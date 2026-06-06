@@ -10,6 +10,14 @@ versioni secondo [Semantic Versioning](https://semver.org/lang/it/): `MAJOR.MINO
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-06-06
+### Aggiunto
+- **Elemento decorativo "Onda"** nell'editor canvas (linea ondulata con colore, spessore e numero di onde regolabili), esportato anche in PDF. I menù in stile *il baretto* usano automaticamente l'onda come divisore.
+- **Anteprima di stile** in ogni card della pagina Ristoranti (mini-menù che mostra font, colori e decori a colpo d'occhio).
+- **Duplica ristorante**: crea una copia di un locale (solo stile, oppure stile + dati).
+- **Backup completo (.json)** in Impostazioni: esporta/ripristina TUTTI i ristoranti e i loro dati in un unico file (utile per cambiare dispositivo o tenere una copia di sicurezza).
+- La Dashboard mostra tipologia e città del ristorante attivo accanto al nome.
+
 ## [1.5.0] - 2026-06-06
 ### Aggiunto
 - **Multi-ristorante (consulenza)**: nuova sezione **Ristoranti** per gestire più locali da un'unica app (il tuo, *il baretto*, e altri). Ogni ristorante ha i propri dati (ingredienti, piatti, menù, HACCP, impostazioni) e il proprio **stile**.

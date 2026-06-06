@@ -42,7 +42,9 @@ function buildFromMenu(m){
   const items=[
     {id:rid(),type:'text',x:M,y:60,w:W,h:64,z:5,rot:0,text:s.nome_locale||'Il nostro menù',style:{fontFamily:fDisp,fontSize:42,color:ink,align:'center',weight:700,italic:false,lineHeight:1.1,transform:tr}},
     {id:rid(),type:'text',x:M,y:130,w:W,h:28,z:5,rot:0,text:m?.nome||'',style:{fontFamily:fDisp,fontSize:16,color:muted,align:'center',weight:500,italic:true,lineHeight:1.2}},
-    {id:rid(),type:'line',x:PW/2-60,y:168,w:120,h:2,z:5,rot:0,style:{color:gold,thickness:2}},
+    coast
+      ? {id:rid(),type:'deco',x:PW/2-95,y:164,w:190,h:18,z:5,rot:0,style:{color:gold,thickness:2.5,cycles:5}}
+      : {id:rid(),type:'line',x:PW/2-60,y:168,w:120,h:2,z:5,rot:0,style:{color:gold,thickness:2}},
   ];
   const pById = new Map(store.all('piatti').map(p=>[p.id,p]));
   const piatti = (m?.piatti_ids||[]).map(id=>pById.get(id)).filter(Boolean);

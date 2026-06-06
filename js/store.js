@@ -181,6 +181,39 @@ const store = {
     writeApp(appMeta); notify('__app__');
     return true;
   },
+  duplicateRestaurant(id, copyData){
+    const src = appMeta.restaurants.find(r=>r.id===id); if(!src) return null;
+    const r = makeRestaurant({ name:src.name+' (copia)', kind:src.kind, place:src.place, logo:src.logo, themeKey:src.themeKey, custom:{...(src.custom||{})} });
+    appMeta.restaurants.push(r); writeApp(appMeta);
+    if(copyData){
+      for(const k of KEYS){ const raw=localStorage.getItem(partKey(id,k)); if(raw!=null) localStorage.setItem(partKey(r.id,k), raw); }
+      syncName(r.id, r.name);
+    } else {
+      const s = structuredClone(defaults.settings); s.nome_locale = r.name; writeFor(r.id,'settings',s);
+    }
+    notify('__app__');
+    return r;
+  },
+
+  // ===== Backup / ripristino dell'intero spazio di lavoro (tutti i ristoranti) =====
+  backup(){
+    const out = { _fmt:'cambusa-backup', _v:1, savedAt:Date.now(), app:structuredClone(appMeta), parts:{} };
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith(NS) && k!==APP_KEY) out.parts[k] = localStorage.getItem(k);
+    }
+    return out;
+  },
+  restore(obj){
+    if(!obj || obj._fmt!=='cambusa-backup' || !obj.app || !Array.isArray(obj.app.restaurants)) return false;
+    const del=[];
+    for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.startsWith(NS)) del.push(k); }
+    del.forEach(k=>localStorage.removeItem(k));
+    for(const k of Object.keys(obj.parts||{})) localStorage.setItem(k, obj.parts[k]);
+    appMeta = obj.app; writeApp(appMeta);
+    notify('__app__'); for(const k of KEYS) notify(k);
+    return true;
+  },
 };
 
 RM.store = store;

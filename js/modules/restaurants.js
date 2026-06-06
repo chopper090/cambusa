@@ -57,13 +57,40 @@ function card(r, isActive){
       : el('button',{class:'btn btn-primary btn-sm',text:'✓ Rendi attivo',onclick:()=>{
           store.setActive(r.id); toast(`Ora stai gestendo “${r.name}”`,'ok');
         }}),
-    el('button',{class:'btn btn-sm',text:'✎ Stile e dati',onclick:()=>edit(r.id)}),
+    el('button',{class:'btn btn-sm',text:'✎ Stile',onclick:()=>edit(r.id)}),
+    el('button',{class:'btn btn-sm',title:'Duplica ristorante',text:'⎘',onclick:()=>duplicate(r)}),
     el('div',{class:'spacer'}),
     el('button',{class:'btn btn-sm btn-danger',title:'Elimina ristorante',text:'🗑',onclick:()=>del(r)}),
   ]);
   const c = el('div',{class:'card rest-card'+(isActive?' active':'')});
-  c.append(el('div',{class:'rest-card-bar',style:{background:`linear-gradient(135deg, ${t.accent}, ${t.accent2||t.accent})`}}), head, swatches, meta, actions);
+  c.append(el('div',{class:'rest-card-bar',style:{background:`linear-gradient(135deg, ${t.accent}, ${t.accent2||t.accent})`}}), head, miniPreview(t), swatches, meta, actions);
   return c;
+}
+
+function miniPreview(t){
+  const coast = t.decor==='coast';
+  const wrap = el('div',{class:'rest-card-prev',style:{background:t.paper,color:t.ink,fontFamily:t.fontBody}});
+  wrap.append(
+    el('div',{class:'rcp-name',style:{fontFamily:t.fontDisplay,color:t.ink,textTransform:coast?'uppercase':'none',letterSpacing:coast?'.03em':'normal'},text:'Il menù'}),
+    el('div',{class:'rcp-rule',style:{background:t.gold}}),
+    el('div',{class:'rcp-dish'},[
+      el('span',{style:{color:t.ink},text:'Piatto del giorno'}),
+      el('span',{style:{color:t.gold,fontWeight:'600'},text:coast?'| 8,00 €':'8,00 €'}),
+    ]),
+  );
+  return wrap;
+}
+
+function duplicate(r){
+  const {close} = openModal({
+    title:'Duplica ristorante',
+    body:el('p',{class:'muted',text:`Crea una copia di “${r.name}”. Scegli cosa includere nella copia:`}),
+    footer:[
+      el('button',{class:'btn',text:'Annulla',onclick:()=>close()}),
+      el('button',{class:'btn',text:'Solo stile',onclick:()=>{ store.duplicateRestaurant(r.id,false); toast('Copia creata (solo stile)','ok'); close(); }}),
+      el('button',{class:'btn btn-primary',text:'Stile + dati',onclick:()=>{ store.duplicateRestaurant(r.id,true); toast('Copia creata con i dati','ok'); close(); }}),
+    ]
+  });
 }
 
 async function del(r){

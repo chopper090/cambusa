@@ -14,7 +14,9 @@ Dalla sezione **Ristoranti** gestisci più locali da un'unica app — il tuo, *i
 - **dati propri e separati**: ingredienti, piatti, menù, HACCP, fornitori, giacenze e impostazioni;
 - **stile proprio**: logo, palette e font, con preset pronti (*Classico*, *il baretto*, *Elegante*, *Mediterraneo*, *Minimal*) o personalizzazione completa, con anteprima live.
 
-Lo **switcher** in alto nella barra laterale cambia al volo il ristorante attivo: l'app si "veste" del suo stile e i **menù esportati** ereditano font, colori e decori (es. prezzi stile bar `| 8,00 €` e onde/agrumi per *il baretto*). I dati già presenti vengono migrati automaticamente nel ristorante predefinito senza perdite.
+Lo **switcher** in alto nella barra laterale cambia al volo il ristorante attivo: l'app si "veste" del suo stile e i **menù esportati** ereditano font, colori e decori (es. prezzi stile bar `| 8,00 €` e onde per *il baretto*). I dati già presenti vengono migrati automaticamente nel ristorante predefinito senza perdite.
+
+Dalla pagina puoi anche **duplicare** un ristorante (solo stile o stile + dati). In **Impostazioni → Backup completo** esporti/ripristini *tutti* i ristoranti e i loro dati in un unico file `.json` (comodo per spostare il lavoro su un altro dispositivo).
 
 ## Avvio rapido (locale)
 

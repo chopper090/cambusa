@@ -13,6 +13,7 @@ function unmount(){ off?.(); off=null; }
 function render(root){
   const k = kpiGlobali();
   const settings = store.getSettings();
+  const active = store.getActive ? store.getActive() : null;
   const target = settings.foodcost_target_pct||30;
 
   const piatti = store.all('piatti');
@@ -24,7 +25,10 @@ function render(root){
   root.innerHTML='';
   root.append(
     el('div',{class:'view-head'},[
-      el('h1',{text:settings.nome_locale ? settings.nome_locale : 'Dashboard'}),
+      el('h1',{},[
+        settings.nome_locale ? settings.nome_locale : 'Dashboard',
+        (active && (active.kind||active.place)) ? el('span',{class:'count',text:[active.kind,active.place].filter(Boolean).join(' · ')}) : null,
+      ]),
       el('div',{class:'actions'},[
         el('a',{href:'#piatti',class:'btn',text:'→ Piatti'}),
         el('a',{href:'#ingredienti',class:'btn',text:'→ Ingredienti'}),
