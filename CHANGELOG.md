@@ -10,6 +10,25 @@ versioni secondo [Semantic Versioning](https://semver.org/lang/it/): `MAJOR.MINO
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-06-06
+### Aggiunto
+- **Elemento decorativo "Onda"** nell'editor canvas (linea ondulata con colore, spessore e numero di onde regolabili), esportato anche in PDF. I menù in stile *il baretto* usano automaticamente l'onda come divisore.
+- **Anteprima di stile** in ogni card della pagina Ristoranti (mini-menù che mostra font, colori e decori a colpo d'occhio).
+- **Duplica ristorante**: crea una copia di un locale (solo stile, oppure stile + dati).
+- **Backup completo (.json)** in Impostazioni: esporta/ripristina TUTTI i ristoranti e i loro dati in un unico file (utile per cambiare dispositivo o tenere una copia di sicurezza).
+- La Dashboard mostra tipologia e città del ristorante attivo accanto al nome.
+
+## [1.5.0] - 2026-06-06
+### Aggiunto
+- **Multi-ristorante (consulenza)**: nuova sezione **Ristoranti** per gestire più locali da un'unica app (il tuo, *il baretto*, e altri). Ogni ristorante ha i propri dati (ingredienti, piatti, menù, HACCP, impostazioni) e il proprio **stile**.
+- **Stile per ristorante**: logo, palette e font con preset pronti (*Classico*, *il baretto*, *Elegante*, *Mediterraneo*, *Minimal*) oppure personalizzazione completa di colori e font, con **anteprima live** del menù.
+- **Switcher in sidebar** per cambiare al volo il ristorante attivo; l'app (accento, logo, nome) si "veste" di conseguenza.
+- I **menù generati** ereditano lo stile del ristorante attivo (font titoli/corpo, colori, prezzi in stile bar `| 8,00 €` e decori "mare/agrumi" per *il baretto*).
+- Tema *il baretto*: titoli condensati (Bebas Neue), palette navy/azzurro/arancio; aggiunti i font Bebas Neue, Jost, Oswald.
+### Modificato
+- I dati ora sono **partizionati per ristorante**. I dati esistenti vengono migrati automaticamente nel ristorante "Il mio ristorante" (copia non distruttiva: i dati originali non vengono cancellati).
+- **Impostazioni** ora valgono per il ristorante attivo; l'azzeramento dati agisce solo sul locale corrente.
+
 ## [1.4.1] - 2026-06-04
 ### Modificato
 - _descrivi qui le modifiche_

@@ -22,6 +22,15 @@ function pdfFont(doc, family, weight, italic){
   doc.setFont(base, style);
 }
 
+// Punti di un'onda sinusoidale (condivisi da render HTML e export PDF).
+function wavePoints(w, h, cycles){
+  const cyc = Math.max(1, cycles||4);
+  const n = Math.max(16, Math.round(cyc*16));
+  const amp = (h/2)*0.85, mid = h/2, pts = [];
+  for(let i=0;i<=n;i++){ pts.push([w*i/n, mid - amp*Math.sin((i/n)*cyc*2*Math.PI)]); }
+  return pts;
+}
+
 // ============================================================================
 // create(opts) → editor
 // opts = {root, doc, onChange(doc), exportName, fmt:'a4',
@@ -79,6 +88,7 @@ function create(opts){
       {l:'Linea', i:'—', f:()=>addItem({type:'line', w:240, h:2, style:{color:'#191918', thickness:2}})},
       {l:'Rett.', i:'▭', f:()=>addItem({type:'rect', w:220, h:120, style:{fill:'#f0f0ec', stroke:'#00000000', strokeW:0, radius:8}})},
       {l:'Ellisse', i:'◯', f:()=>addItem({type:'ellipse', w:160, h:160, style:{fill:'#eaf1fd', stroke:'#00000000', strokeW:0}})},
+      {l:'Onda', i:'∿', f:()=>addItem({type:'deco', w:260, h:22, style:{color:'#191918', thickness:2, cycles:4}})},
       {l:'Immagine', i:'🖼', f:()=>pickImage()},
     ];
     for(const cfg of (opts.extraTools||[])) addBtns.push({l:cfg.label, i:cfg.icon, f:cfg.onAdd});
@@ -181,6 +191,11 @@ function create(opts){
     } else if(it.type==='ellipse'){
       d.style.background=it.style.fill||'#eaf1fd'; d.style.borderRadius='50%';
       if(it.style.strokeW) d.style.border=`${it.style.strokeW}px solid ${it.style.stroke||'#000'}`;
+    } else if(it.type==='deco'){
+      d.style.background='transparent';
+      const col=it.style?.color||'#191918', th=it.style?.thickness||2, cyc=it.style?.cycles||4;
+      const pts=wavePoints(it.w, it.h, cyc).map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+      d.innerHTML=`<svg width="100%" height="100%" viewBox="0 0 ${it.w} ${it.h}" preserveAspectRatio="none" style="display:block;overflow:visible"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="${th}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
     } else if(it.type==='image'){
       if(it.style?.opacity!=null) d.style.opacity=it.style.opacity;
       if(it.src){
@@ -344,6 +359,13 @@ function create(opts){
       col.append(colorF('Colore', it.style.color||'#191918', v=>{it.style.color=v;drawStage();}));
       col.append(numF('Spessore', it.style.thickness||2, v=>{it.style.thickness=v;it.h=v;drawStage();}, 1, 40));
     }
+    if(it.type==='deco'){
+      col.append(colorF('Colore', it.style.color||'#191918', v=>{it.style.color=v;drawStage();}));
+      col.append(grid2(
+        numF('Spessore', it.style.thickness||2, v=>{it.style.thickness=v;drawStage();}, 1, 12),
+        numF('Numero onde', it.style.cycles||4, v=>{it.style.cycles=Math.max(1,Math.round(v));drawStage();}, 1, 20),
+      ));
+    }
     if(it.type==='rect'||it.type==='ellipse'){
       col.append(colorF('Riempimento', it.style.fill||'#f0f0ec', v=>{it.style.fill=v;drawStage();}));
       col.append(grid2(
@@ -401,7 +423,7 @@ function create(opts){
     return col;
   }
   function itemLabel(it){
-    const L={text:'Testo',line:'Linea',rect:'Rettangolo',ellipse:'Ellisse',image:'Immagine',dish:'Piatto'};
+    const L={text:'Testo',line:'Linea',rect:'Rettangolo',ellipse:'Ellisse',deco:'Onda',image:'Immagine',dish:'Piatto'};
     if(opts.boundLabelShort && (it.bound||(it.type||'').startsWith('recipe'))) return opts.boundLabelShort(it);
     return L[it.type]||it.type;
   }
@@ -514,6 +536,10 @@ function create(opts){
     } else if(it.type==='line'){
       pdf.setDrawColor(it.style.color||'#191918').setLineWidth(Math.max(0.5,(it.style.thickness||2)*sc));
       pdf.line(x, y+h/2, x+w, y+h/2);
+    } else if(it.type==='deco'){
+      pdf.setDrawColor(it.style.color||'#191918').setLineWidth(Math.max(0.4,(it.style.thickness||2)*sc));
+      const pts=wavePoints(w, h, it.style.cycles||4);
+      for(let i=1;i<pts.length;i++) pdf.line(x+pts[i-1][0], y+pts[i-1][1], x+pts[i][0], y+pts[i][1]);
     } else if(it.type==='rect'){
       if(it.style.fill && it.style.fill!=='#00000000'){ pdf.setFillColor(it.style.fill); if(it.style.radius) pdf.roundedRect(x,y,w,h,it.style.radius*sc,it.style.radius*sc,'F'); else pdf.rect(x,y,w,h,'F'); }
       if(it.style.strokeW){ pdf.setDrawColor(it.style.stroke||'#000').setLineWidth(it.style.strokeW*sc); if(it.style.radius) pdf.roundedRect(x,y,w,h,it.style.radius*sc,it.style.radius*sc,'S'); else pdf.rect(x,y,w,h,'S'); }

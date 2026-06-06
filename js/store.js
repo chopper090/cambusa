@@ -4,6 +4,8 @@ const RM = window.RM = window.RM || {};
 const {uid} = RM.utils;
 
 const NS = 'rm:v1:';
+const APP_KEY = NS + '__app__';                 // registro globale ristoranti + attivo
+// Chiavi partizionate per-ristorante (ogni locale ha i propri dati e impostazioni):
 const KEYS = ['ingredienti','fornitori','piatti','menu','haccp','giacenze','settings'];
 
 const defaults = {
@@ -24,14 +26,74 @@ const defaults = {
   }
 };
 
-const read = k => {
+// ---- chiavi namespacate per ristorante ----
+const partKey = (restId,k) => NS + 'r:' + restId + ':' + k;
+
+const readFor = (restId,k) => {
   try{
-    const raw = localStorage.getItem(NS+k);
+    const raw = localStorage.getItem(partKey(restId,k));
     if(raw==null) return structuredClone(defaults[k]);
     return JSON.parse(raw);
   }catch{ return structuredClone(defaults[k]); }
 };
-const write = (k,v) => localStorage.setItem(NS+k, JSON.stringify(v));
+const writeFor = (restId,k,v) => localStorage.setItem(partKey(restId,k), JSON.stringify(v));
+
+// ============================================================================
+// Registro ristoranti (globale) + migrazione dai dati legacy non partizionati.
+// ============================================================================
+function readApp(){ try{ const raw=localStorage.getItem(APP_KEY); return raw==null?null:JSON.parse(raw); }catch{ return null; } }
+function writeApp(a){ localStorage.setItem(APP_KEY, JSON.stringify(a)); }
+
+function makeRestaurant(o){
+  return {
+    id: o.id || ('r_'+uid('').slice(1)),
+    name: o.name || 'Ristorante',
+    kind: o.kind || '',
+    place: o.place || '',
+    logo: o.logo || '',
+    themeKey: o.themeKey || 'classico',
+    custom: o.custom || {},
+    createdAt: o.createdAt || Date.now(),
+  };
+}
+
+function syncName(restId, name){
+  const s = readFor(restId,'settings');
+  if(s.nome_locale !== name){ s.nome_locale = name; writeFor(restId,'settings',s); }
+}
+
+// Prima esecuzione con la nuova versione: crea il ristorante di default,
+// migra i dati legacy (copiandoli, senza mai cancellarli) e semina "il baretto".
+function migrate(){
+  const legacyRaw = k => { try{ return localStorage.getItem(NS+k); }catch{ return null; } };
+  let legacyName = '';
+  try{ const ls = JSON.parse(legacyRaw('settings')||'null'); if(ls && ls.nome_locale) legacyName = ls.nome_locale; }catch{}
+
+  const mainId = 'r_main';
+  // copia legacy → partizione del ristorante principale (solo se non già migrato)
+  for(const k of KEYS){
+    const dst = partKey(mainId,k);
+    if(localStorage.getItem(dst) != null) continue;
+    const raw = legacyRaw(k);
+    if(raw != null) localStorage.setItem(dst, raw);
+  }
+
+  const main = makeRestaurant({ id:mainId, name: legacyName || 'Il mio ristorante', kind:'Ristorante', themeKey:'classico' });
+  const baretto = makeRestaurant({ id:'r_baretto', name:'il baretto', kind:'Cocktail & Wine Bar', place:'Messina', themeKey:'baretto' });
+
+  const meta = { restaurants:[main, baretto], active: mainId };
+  writeApp(meta);
+  syncName(mainId, main.name);
+  syncName('r_baretto', baretto.name);
+  return meta;
+}
+
+let appMeta = readApp() || migrate();
+const activeId = () => appMeta.active;
+
+// ---- read/write sul ristorante attivo ----
+const read  = k => readFor(activeId(), k);
+const write = (k,v) => writeFor(activeId(), k, v);
 
 const listeners = new Set();
 const notify = (k)=>{ for(const fn of listeners) try{fn(k);}catch(e){console.error(e);} };
@@ -67,6 +129,11 @@ const store = {
   setSettings(patch){
     const s = {...read('settings'), ...patch};
     write('settings', s); notify('settings');
+    // mantieni il nome del ristorante allineato al nome del locale
+    if(patch && patch.nome_locale != null){
+      const r = appMeta.restaurants.find(x=>x.id===activeId());
+      if(r && r.name !== patch.nome_locale){ r.name = patch.nome_locale; writeApp(appMeta); notify('__app__'); }
+    }
     return s;
   },
   exportAll(){ const o={}; for(const k of KEYS) o[k]=read(k); return o; },
@@ -80,6 +147,73 @@ const store = {
   },
   resetAll(){ for(const k of KEYS){ write(k, structuredClone(defaults[k])); notify(k); } },
   KEYS,
+
+  // ===== Ristoranti (multi-cliente) =====
+  getRestaurants(){ return appMeta.restaurants.map(r=>({...r})); },
+  getActiveId(){ return appMeta.active; },
+  getActive(){ return appMeta.restaurants.find(r=>r.id===appMeta.active) || appMeta.restaurants[0]; },
+  setActive(id){
+    if(!appMeta.restaurants.some(r=>r.id===id)) return false;
+    if(appMeta.active===id) return true;
+    appMeta.active = id; writeApp(appMeta); notify('__app__');
+    return true;
+  },
+  addRestaurant(o){
+    const r = makeRestaurant(o);
+    appMeta.restaurants.push(r); writeApp(appMeta);
+    const s = structuredClone(defaults.settings); s.nome_locale = r.name;
+    writeFor(r.id,'settings',s);
+    notify('__app__');
+    return r;
+  },
+  updateRestaurant(id, patch){
+    const r = appMeta.restaurants.find(x=>x.id===id); if(!r) return null;
+    Object.assign(r, patch); writeApp(appMeta);
+    if(patch && patch.name!=null) syncName(id, patch.name);
+    notify('__app__');
+    return {...r};
+  },
+  removeRestaurant(id){
+    if(appMeta.restaurants.length<=1) return false;
+    appMeta.restaurants = appMeta.restaurants.filter(r=>r.id!==id);
+    for(const k of KEYS) localStorage.removeItem(partKey(id,k));
+    if(appMeta.active===id) appMeta.active = appMeta.restaurants[0].id;
+    writeApp(appMeta); notify('__app__');
+    return true;
+  },
+  duplicateRestaurant(id, copyData){
+    const src = appMeta.restaurants.find(r=>r.id===id); if(!src) return null;
+    const r = makeRestaurant({ name:src.name+' (copia)', kind:src.kind, place:src.place, logo:src.logo, themeKey:src.themeKey, custom:{...(src.custom||{})} });
+    appMeta.restaurants.push(r); writeApp(appMeta);
+    if(copyData){
+      for(const k of KEYS){ const raw=localStorage.getItem(partKey(id,k)); if(raw!=null) localStorage.setItem(partKey(r.id,k), raw); }
+      syncName(r.id, r.name);
+    } else {
+      const s = structuredClone(defaults.settings); s.nome_locale = r.name; writeFor(r.id,'settings',s);
+    }
+    notify('__app__');
+    return r;
+  },
+
+  // ===== Backup / ripristino dell'intero spazio di lavoro (tutti i ristoranti) =====
+  backup(){
+    const out = { _fmt:'cambusa-backup', _v:1, savedAt:Date.now(), app:structuredClone(appMeta), parts:{} };
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith(NS) && k!==APP_KEY) out.parts[k] = localStorage.getItem(k);
+    }
+    return out;
+  },
+  restore(obj){
+    if(!obj || obj._fmt!=='cambusa-backup' || !obj.app || !Array.isArray(obj.app.restaurants)) return false;
+    const del=[];
+    for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.startsWith(NS)) del.push(k); }
+    del.forEach(k=>localStorage.removeItem(k));
+    for(const k of Object.keys(obj.parts||{})) localStorage.setItem(k, obj.parts[k]);
+    appMeta = obj.app; writeApp(appMeta);
+    notify('__app__'); for(const k of KEYS) notify(k);
+    return true;
+  },
 };
 
 RM.store = store;

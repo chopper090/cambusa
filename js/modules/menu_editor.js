@@ -31,11 +31,20 @@ function persist(){ const m=store.get('menu',menuId); if(m){ m.layout=docRef; st
 
 function buildFromMenu(m){
   const s = store.getSettings();
+  // stile del ristorante attivo (palette + font + decori)
+  const t = (RM.clients && RM.clients.resolve) ? RM.clients.resolve(store.getActive()) : null;
+  const ink = t?.ink || '#191918', paper = t?.paper || '#ffffff', gold = t?.gold || '#191918', muted = t?.muted || '#737373';
+  const fDisp = t?.fontDisplay || 'Playfair Display, serif', fBody = t?.fontBody || 'Playfair Display, serif';
+  const coast = t?.decor === 'coast';
+  const tr = coast ? 'upper' : '';
+  const dishStyle = {fontFamily:fBody, fontSize:15, color:ink, priceColor:gold, descColor:muted, priceSep:coast?'|':''};
   const W = PW-2*M;
   const items=[
-    {id:rid(),type:'text',x:M,y:60,w:W,h:64,z:5,rot:0,text:s.nome_locale||'Il nostro menù',style:{fontFamily:'Playfair Display, serif',fontSize:42,color:'#191918',align:'center',weight:700,italic:false,lineHeight:1.1}},
-    {id:rid(),type:'text',x:M,y:130,w:W,h:28,z:5,rot:0,text:m?.nome||'',style:{fontFamily:'Playfair Display, serif',fontSize:16,color:'#737373',align:'center',weight:500,italic:true,lineHeight:1.2}},
-    {id:rid(),type:'line',x:PW/2-60,y:168,w:120,h:2,z:5,rot:0,style:{color:'#191918',thickness:2}},
+    {id:rid(),type:'text',x:M,y:60,w:W,h:64,z:5,rot:0,text:s.nome_locale||'Il nostro menù',style:{fontFamily:fDisp,fontSize:42,color:ink,align:'center',weight:700,italic:false,lineHeight:1.1,transform:tr}},
+    {id:rid(),type:'text',x:M,y:130,w:W,h:28,z:5,rot:0,text:m?.nome||'',style:{fontFamily:fDisp,fontSize:16,color:muted,align:'center',weight:500,italic:true,lineHeight:1.2}},
+    coast
+      ? {id:rid(),type:'deco',x:PW/2-95,y:164,w:190,h:18,z:5,rot:0,style:{color:gold,thickness:2.5,cycles:5}}
+      : {id:rid(),type:'line',x:PW/2-60,y:168,w:120,h:2,z:5,rot:0,style:{color:gold,thickness:2}},
   ];
   const pById = new Map(store.all('piatti').map(p=>[p.id,p]));
   const piatti = (m?.piatti_ids||[]).map(id=>pById.get(id)).filter(Boolean);
@@ -44,12 +53,12 @@ function buildFromMenu(m){
   let y=205;
   for(const cat of CATEGORIE_PIATTI){
     const list=grouped[cat]; if(!list?.length) continue;
-    items.push({id:rid(),type:'text',x:M,y,w:W,h:32,z:5,rot:0,text:cat.charAt(0).toUpperCase()+cat.slice(1)+(list.length>1?'i':''),style:{fontFamily:'Playfair Display, serif',fontSize:22,color:'#191918',align:'center',weight:700,italic:false,lineHeight:1.2}});
+    items.push({id:rid(),type:'text',x:M,y,w:W,h:32,z:5,rot:0,text:cat.charAt(0).toUpperCase()+cat.slice(1)+(list.length>1?'i':''),style:{fontFamily:fDisp,fontSize:22,color:ink,align:'center',weight:700,italic:false,lineHeight:1.2,transform:tr}});
     y+=40;
-    for(const p of list){ items.push({id:rid(),type:'dish',x:M,y,w:W,h:48,z:6,rot:0,dishId:p.id,showPrice:true,showDesc:true,style:{fontFamily:'Playfair Display, serif',fontSize:15,color:'#191918'}}); y+=54; if(y>1040){break;} }
+    for(const p of list){ items.push({id:rid(),type:'dish',x:M,y,w:W,h:48,z:6,rot:0,dishId:p.id,showPrice:true,showDesc:true,style:{...dishStyle}}); y+=54; if(y>1040){break;} }
     y+=14; if(y>1040) break;
   }
-  return {pages:[{id:'pg_'+rid(),bg:'#ffffff',wm:'', items}]};
+  return {pages:[{id:'pg_'+rid(),bg:paper,wm:'', items}]};
 }
 function rid(){ return Math.random().toString(36).slice(2,8); }
 
@@ -95,14 +104,24 @@ function boundHTML(item){
   const wrap=el('div',{style:{width:'100%',color:item.style?.color||'#191918',fontFamily:item.style?.fontFamily||'Playfair Display, serif'}});
   if(!p){ wrap.innerHTML='<span style="color:#b3261e;font-size:12px">[piatto non trovato]</span>'; return wrap; }
   const fs=item.style?.fontSize||15;
+  const priceColor=item.style?.priceColor||item.style?.color||'#191918';
+  const descColor=item.style?.descColor||'#737373';
+  const sep=item.style?.priceSep;
+  let priceNode=null;
+  if(item.showPrice!==false && p.prezzo_vendita){
+    priceNode = el('span',{style:{fontWeight:600,fontSize:fs+'px',color:priceColor}},[
+      sep ? el('i',{style:{color:descColor,fontStyle:'normal',marginRight:'5px'},text:sep}) : null,
+      fmtEur(p.prezzo_vendita),
+    ]);
+  }
   const head=el('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:'12px'}},[
     el('span',{style:{fontWeight:700,fontSize:fs+'px'},text:p.nome}),
-    (item.showPrice!==false && p.prezzo_vendita)?el('span',{style:{fontWeight:500,fontSize:fs+'px'},text:fmtEur(p.prezzo_vendita)}):null,
+    priceNode,
   ]);
   wrap.appendChild(head);
   if(item.showDesc!==false){
     const desc=(p.procedimento||'').slice(0,160) || (p.ingredienti||[]).slice(0,5).map(r=>store.get('ingredienti',r.ing_id)?.nome).filter(Boolean).join(', ');
-    if(desc) wrap.appendChild(el('div',{style:{fontSize:(fs-3)+'px',fontStyle:'italic',color:'#737373',marginTop:'2px'},text:desc}));
+    if(desc) wrap.appendChild(el('div',{style:{fontSize:(fs-3)+'px',fontStyle:'italic',color:descColor,marginTop:'2px'},text:desc}));
   }
   return wrap;
 }
@@ -127,10 +146,15 @@ function boundPDF(pdf, item, g){
   pdfFont(pdf, item.style?.fontFamily||'Playfair', 700, false);
   pdf.setFontSize(fs).setTextColor(item.style?.color||'#191918');
   pdf.text(p.nome, x, y+fs);
-  if(item.showPrice!==false && p.prezzo_vendita){ pdfFont(pdf,'Inter',400,false); pdf.setFontSize(fs).setTextColor(item.style?.color||'#191918'); pdf.text(fmtEur(p.prezzo_vendita), x+w, y+fs, {align:'right'}); }
+  if(item.showPrice!==false && p.prezzo_vendita){
+    pdfFont(pdf,'Inter',600,false);
+    pdf.setFontSize(fs).setTextColor(item.style?.priceColor||item.style?.color||'#191918');
+    const sep=item.style?.priceSep ? item.style.priceSep+' ' : '';
+    pdf.text(sep+fmtEur(p.prezzo_vendita), x+w, y+fs, {align:'right'});
+  }
   if(item.showDesc!==false){
     const desc=(p.procedimento||'').slice(0,160);
-    if(desc){ pdfFont(pdf,'Playfair',400,true); pdf.setFontSize(fs*0.8).setTextColor('#737373'); pdf.splitTextToSize(desc,w).slice(0,2).forEach((ln,i)=>pdf.text(ln,x,y+fs+12*sc+i*fs*0.95)); }
+    if(desc){ pdfFont(pdf,'Playfair',400,true); pdf.setFontSize(fs*0.8).setTextColor(item.style?.descColor||'#737373'); pdf.splitTextToSize(desc,w).slice(0,2).forEach((ln,i)=>pdf.text(ln,x,y+fs+12*sc+i*fs*0.95)); }
   }
 }
 

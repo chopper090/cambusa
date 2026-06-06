@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,500&family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- font display per i temi ristorante (il baretto, minimal, …) -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Jost:ital,wght@0,300;0,400;0,500;1,400&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
 <meta name="description" content="Gestione foodcost, ricettario, menù e HACCP per ristorazione. Funziona offline.">
 
 <!-- PWA -->
@@ -31,11 +33,18 @@
 <body>
 <div id="app">
   <aside id="sidebar">
-    <div class="brand">
-      <span class="logo">Cb</span>
-      <span class="brand-name" id="brand-name">Cambusa</span>
+    <a class="brand" href="#ristoranti" id="brand-link" title="Gestisci ristoranti">
+      <span class="logo" id="brand-logo">Cb</span>
+      <span class="brand-meta">
+        <span class="brand-name" id="brand-name">Cambusa</span>
+        <span class="brand-kind" id="brand-kind"></span>
+      </span>
+    </a>
+    <div class="rest-switch-row">
+      <select id="rest-switch" class="rest-switch" title="Cambia ristorante attivo" aria-label="Cambia ristorante attivo"></select>
     </div>
     <nav>
+      <a href="#ristoranti" data-route="ristoranti"><span class="nav-ic">❖</span> Ristoranti</a>
       <a href="#dashboard" data-route="dashboard"><span class="nav-ic">◧</span> Dashboard</a>
       <a href="#ingredienti" data-route="ingredienti"><span class="nav-ic">◇</span> Ingredienti</a>
       <a href="#piatti" data-route="piatti"><span class="nav-ic">◉</span> Piatti</a>
@@ -77,9 +86,10 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
-<!-- Core: ordine OBBLIGATORIO (version → utils → store → calc → kb → excel/pdf → canvas → moduli → app) -->
+<!-- Core: ordine OBBLIGATORIO (version → utils → clients → store → calc → kb → excel/pdf → canvas → moduli → app) -->
 <script src="js/version.js"></script>
 <script src="js/utils.js"></script>
+<script src="js/clients.js"></script>
 <script src="js/store.js"></script>
 <script src="js/calc.js"></script>
 <script src="js/kb_prezzi.js"></script>
@@ -88,6 +98,7 @@
 <script src="js/canvas_engine.js"></script>
 
 <!-- Moduli -->
+<script src="js/modules/restaurants.js"></script>
 <script src="js/modules/dashboard.js"></script>
 <script src="js/modules/ingredienti.js"></script>
 <script src="js/modules/piatti.js"></script>
