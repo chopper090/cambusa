@@ -1,7 +1,7 @@
 {
   "name": "Cambusa",
   "short_name": "Cambusa",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "id": "cambusa",
   "description": "Gestione foodcost, ricettario, menù e HACCP per ristorazione. Funziona offline.",
   "start_url": "./index.html",
