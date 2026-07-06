@@ -66,25 +66,44 @@ function edit(id){
   grouped['altro'] = grouped['altro']||[];
   for(const p of piatti){ const cat = grouped[p.categoria] ? p.categoria : 'altro'; grouped[cat].push(p); }
 
+  const selInfo = el('span',{class:'muted',style:{fontSize:'12px'}});
+  const updateInfo = ()=>{ selInfo.textContent = `${sel.size} selezionati su ${piatti.length}`; };
+  let checkboxes = [];
+
   function renderGroups(){
-    grpBox.innerHTML='';
+    grpBox.innerHTML=''; checkboxes = [];
+    if(!piatti.length){
+      const active = store.getActive?.() || {};
+      grpBox.appendChild(el('div',{class:'drop'},[
+        el('div',{text:`Nessun piatto in «${active.name||'questo ristorante'}».`}),
+        el('div',{class:'muted',style:{fontSize:'12px',marginTop:'6px'},text:'I piatti sono separati per ristorante: creali nella sezione Piatti di questo ristorante (o carica il menù della Carta dalle Impostazioni), oppure passa al ristorante giusto dal menu in alto a sinistra.'}),
+      ]));
+      updateInfo(); return;
+    }
     for(const cat of [...CATEGORIE_PIATTI,'altro']){
       const items = grouped[cat]; if(!items?.length) continue;
       const sec = el('div',{style:{marginBottom:'14px'}});
       sec.appendChild(el('h4',{style:{margin:'8px 0 6px',textTransform:'capitalize',color:'var(--text-2)'},text:cat}));
       for(const p of items){
+        const cb = el('input',{type:'checkbox',checked:sel.has(p.id),onchange:e=>{ if(e.target.checked) sel.add(p.id); else sel.delete(p.id); updateInfo(); }});
+        checkboxes.push(cb);
         sec.appendChild(el('label',{class:'list-item',style:{cursor:'pointer'}},[
-          el('input',{type:'checkbox',checked:sel.has(p.id),onchange:e=>{ if(e.target.checked) sel.add(p.id); else sel.delete(p.id); }}),
+          cb,
           el('div',{class:'grow'},[
             el('div',{class:'title',text:p.nome}),
-            el('div',{class:'sub',text:`${p.prezzo_vendita?fmtEur(p.prezzo_vendita):'(prezzo non impostato)'}`}),
+            el('div',{class:'sub',text:`${p.categoria||'—'} · ${p.prezzo_vendita?fmtEur(p.prezzo_vendita):'(prezzo non impostato)'}`}),
           ]),
         ]));
       }
+      grpBox.appendChild(sec);   // <-- la sezione va effettivamente aggiunta al contenitore
     }
-    if(piatti.length===0) grpBox.appendChild(el('div',{class:'drop',text:'Crea prima dei piatti nella sezione Piatti.'}));
+    updateInfo();
   }
   renderGroups();
+
+  const selAll = (on)=>{ for(const p of piatti){ if(on) sel.add(p.id); else sel.delete(p.id); } for(const cb of checkboxes) cb.checked=on; updateInfo(); };
+
+  const scrollBox = el('div',{style:{maxHeight:'46vh',overflow:'auto',border:'1px solid var(--border)',borderRadius:'8px',padding:'10px'}},[ grpBox ]);
 
   const body = el('div',{},[
     el('div',{class:'grid-2'},[
@@ -93,8 +112,15 @@ function edit(id){
     ]),
     el('div',{class:'field'},[el('label',{text:'Note'}),fNote]),
     el('hr',{class:'sep'}),
-    el('h3',{text:'Seleziona i piatti'}),
-    grpBox,
+    el('div',{class:'row between wrap',style:{marginBottom:'8px',gap:'8px'}},[
+      el('h3',{style:{margin:'0'},text:'Seleziona i piatti'}),
+      el('div',{class:'row',style:{gap:'8px'}},[
+        selInfo,
+        piatti.length? el('button',{class:'btn btn-sm btn-ghost',text:'Seleziona tutti',onclick:()=>selAll(true)}) : null,
+        piatti.length? el('button',{class:'btn btn-sm btn-ghost',text:'Deseleziona',onclick:()=>selAll(false)}) : null,
+      ]),
+    ]),
+    scrollBox,
   ]);
 
   const {close} = openModal({
