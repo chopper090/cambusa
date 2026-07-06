@@ -30,6 +30,7 @@ function render(){
       el('div',{class:'actions'},[
         el('div',{class:'search'},[ el('input',{type:'text',placeholder:'Cerca ingrediente…',value:q,oninput:e=>{q=e.target.value;render();}}) ]),
         el('button',{class:'btn',text:'📖 Catalogo base',title:'Importa dagli ingredienti base con prezzo GDO stimato',onclick:()=>catalogo()}),
+        el('button',{class:'btn',text:'+ Nuova preparazione',title:'Crea una ricetta/base composta da zero',onclick:()=>edit(null,{tipo:'preparazione'})}),
         el('button',{class:'btn btn-primary',text:'+ Nuovo ingrediente',onclick:()=>edit(null)}),
       ])
     ]),
@@ -263,6 +264,29 @@ function edit(id, prefill={}){
     el('div',{class:'field',style:{marginTop:'10px'}},[ el('label',{text:'Procedimento della preparazione'}), fPrepProc ]),
   ]);
 
+  // ---- collegamento: "usata nei piatti" (dalla ricetta scelgo i piatti) ----
+  const piattiLink = new Set();
+  if(data.id){ for(const p of store.all('piatti')){ if((p.ingredienti||[]).some(r=>r.ing_id===data.id)) piattiLink.add(p.id); } }
+  const linkBox = el('div',{class:'list',style:{maxHeight:'220px',overflow:'auto'}});
+  function buildLinks(){
+    const piatti = store.all('piatti');
+    linkBox.innerHTML='';
+    if(!piatti.length){ linkBox.appendChild(el('div',{class:'drop',text:'Nessun piatto ancora. Crea prima i piatti, poi torna qui a collegarli.'})); return; }
+    for(const p of piatti){
+      const cb = el('input',{type:'checkbox'}); cb.checked = piattiLink.has(p.id);
+      cb.addEventListener('change',()=>{ if(cb.checked) piattiLink.add(p.id); else piattiLink.delete(p.id); });
+      linkBox.appendChild(el('label',{class:'list-item',style:{cursor:'pointer',gap:'10px'}},[
+        cb, el('div',{class:'grow'},[ el('div',{class:'title',text:p.nome}),
+          el('div',{class:'sub',text:p.categoria||'—'}) ])
+      ]));
+    }
+  }
+  const linkPanel = el('div',{class:'field'},[
+    el('label',{text:'Usata nei piatti'}),
+    el('span',{class:'hint',text:'Spunta i piatti che usano questa preparazione: verrà aggiunta ai loro ingredienti (quantità 0, da impostare nel piatto). Togliendo la spunta la rimuovi dal piatto.'}),
+    linkBox,
+  ]);
+
   const priceWrap = el('div',{class:'grid-2'},[
     el('div',{class:'field'},[ el('label',{text:'€ sicuro (fornitore)'}), fPs ]),
     el('div',{class:'field'},[ el('label',{text:'€ medio (stima nazionale)'}), fPm ]),
@@ -275,8 +299,9 @@ function edit(id, prefill={}){
     priceWrap.style.display = prep?'none':'';
     fornWrap.style.display  = prep?'none':'';
     prepPanel.style.display = prep?'':'none';
+    linkPanel.style.display = prep?'':'none';
     algLabel.textContent = prep ? 'Allergeni aggiuntivi (oltre a quelli calcolati dai componenti)' : 'Allergeni';
-    if(prep){ refreshSubPicker(); renderSub(); }
+    if(prep){ refreshSubPicker(); renderSub(); buildLinks(); }
   }
   fTipo.addEventListener('change', applyTipo);
 
@@ -293,6 +318,7 @@ function edit(id, prefill={}){
     ]),
     priceWrap,
     prepPanel,
+    linkPanel,
     fornWrap,
     el('div',{class:'field'},[ algLabel, fAlg ]),
     el('div',{class:'field'},[ el('label',{text:'Note'}), fNote ]),
@@ -329,8 +355,19 @@ function edit(id, prefill={}){
           item.prezzo_medio  = parseFloat(fPm.value)||0;
           item.sub = []; item.resa = 0;
         }
-        store.upsert('ingredienti', item);
-        toast('Ingrediente salvato','ok');
+        const saved = store.upsert('ingredienti', item);
+        // collega/scollega ai piatti selezionati (solo per le preparazioni)
+        let linked=0, unlinked=0;
+        if(tipo==='preparazione'){
+          for(const p of store.all('piatti')){
+            const has  = (p.ingredienti||[]).some(r=>r.ing_id===saved.id);
+            const want = piattiLink.has(p.id);
+            if(want && !has){ p.ingredienti=[...(p.ingredienti||[]), {ing_id:saved.id, grammi:0, note:''}]; store.upsert('piatti', p); linked++; }
+            else if(!want && has){ p.ingredienti=(p.ingredienti||[]).filter(r=>r.ing_id!==saved.id); store.upsert('piatti', p); unlinked++; }
+          }
+        }
+        const extra = linked||unlinked ? ` (${linked} collegati, ${unlinked} scollegati)` : '';
+        toast('Ingrediente salvato'+extra,'ok');
         close();
       }})
     ]
