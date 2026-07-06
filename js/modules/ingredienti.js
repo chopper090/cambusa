@@ -114,7 +114,7 @@ async function del(i){
 }
 
 function edit(id, prefill={}){
-  const data = id ? {...store.get('ingredienti', id)} : {nome:'',categoria:'',unita:'kg',prezzo_sicuro:0,prezzo_medio:0,fornitore_id:'',allergeni:[],note:'',tipo:'semplice',sub:[],resa:0,procedimento:'',...prefill};
+  const data = id ? {...store.get('ingredienti', id)} : {nome:'',categoria:'',unita:'kg',prezzo_sicuro:0,prezzo_medio:0,fornitore_id:'',allergeni:[],note:'',tipo:'semplice',sub:[],resa:0,porzioni:1,procedimento:'',...prefill};
   const forn = store.all('fornitori');
 
   const fNome = el('input',{type:'text',value:data.nome||'',placeholder:'Es. Pomodoro San Marzano',autocomplete:'off'});
@@ -195,11 +195,29 @@ function edit(id, prefill={}){
   const subData = Array.isArray(data.sub) ? data.sub.map(r=>({ing_id:r.ing_id, grammi:r.grammi||0})) : [];
   const fResa = el('input',{type:'number',min:'0',step:'1',value:data.resa||0,style:{maxWidth:'140px'}});
   const fResaUnit = el('span',{class:'muted'});
+  const fPorz = el('input',{type:'number',min:'1',step:'1',value:data.porzioni||1,style:{maxWidth:'110px'}});
+  let prepPorz = Math.max(1, Number(data.porzioni)||1);   // per il riscalo proporzionale
   const fPrepProc = el('textarea',{value:data.procedimento||'',placeholder:'Procedimento della preparazione (facoltativo)…',style:{minHeight:'70px'}});
   const subBox = el('div',{class:'list'});
   const subPicker = el('select',{style:{flex:'1'}});
   const prepPreview = el('div',{class:'row wrap',style:{gap:'14px',marginTop:'10px'}});
   const ingMapNow = ()=> new Map(store.all('ingredienti').map(i=>[i.id,i]));
+
+  // aggiunta rapida di un ingrediente NUOVO (creato in anagrafica) + Invio, come nei piatti
+  const qpNome = el('input',{type:'text',placeholder:'Nuovo ingrediente (es. Salsa di soia)',style:{flex:'2'}});
+  const qpUni  = el('select',{style:{maxWidth:'70px'}}); for(const u of UNITA) qpUni.appendChild(el('option',{value:u,text:u,selected:u==='kg'}));
+  const qpPrezzo = el('input',{type:'number',min:'0',step:'0.01',placeholder:'€/unità',style:{maxWidth:'90px'}});
+  const qpQty  = el('input',{type:'number',min:'0',step:'1',placeholder:'qty',style:{maxWidth:'90px'}});
+  function quickAddPrep(){
+    const nome = qpNome.value.trim(); if(!nome){ toast('Nome ingrediente obbligatorio','err'); qpNome.focus(); return; }
+    const ing = createQuick(nome, {unita:qpUni.value, prezzo_sicuro:parseFloat(qpPrezzo.value)||0, prezzo_medio:parseFloat(qpPrezzo.value)||0});
+    if(subData.some(r=>r.ing_id===ing.id)) toast('Già presente nella ricetta','err');
+    else subData.push({ing_id:ing.id, grammi:parseFloat(qpQty.value)||0});
+    qpNome.value=''; qpPrezzo.value=''; qpQty.value='';
+    refreshSubPicker(); renderSub(); qpNome.focus();
+  }
+  const qpBtn = el('button',{class:'btn btn-primary',text:'+ Crea e aggiungi',onclick:quickAddPrep});
+  for(const inp of [qpNome, qpPrezzo, qpQty]) inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); quickAddPrep(); } });
 
   function refreshSubPicker(){
     const all = store.all('ingredienti').filter(i=>i.id!==data.id); // niente auto-riferimento
@@ -242,24 +260,44 @@ function edit(id, prefill={}){
     const perBaseS = RM.calc.unitCost(virt, map, 'sicuro');
     const perUnitS = (fUni.value==='kg'||fUni.value==='L')?perBaseS*1000:perBaseS;
     const resaEff = (parseFloat(fResa.value)||RM.calc.subQtyTotal(subData)||0);
+    const totCost = perBaseS*resaEff;
+    const porz = Math.max(1, parseFloat(fPorz.value)||1);
     const alg = RM.calc.resolveAllergeni(virt, map);
     prepPreview.innerHTML='';
     prepPreview.append(
-      kpiBox('Costo totale', RM.utils.fmtEur(perBaseS*resaEff)),
+      kpiBox('Costo totale', RM.utils.fmtEur(totCost)),
+      kpiBox('Costo / porzione', RM.utils.fmtEur(totCost/porz)),
       kpiBox('Costo / '+fUni.value, RM.utils.fmtEur(perUnitS)),
       kpiBox('Allergeni', alg.length?alg.join(', '):'—'),
     );
   }
   fResa.addEventListener('input', recalcPrep);
   fUni.addEventListener('change', recalcPrep);
+  // cambiando le porzioni, riscala proporzionalmente le grammature dei componenti e la resa
+  fPorz.addEventListener('change', ()=>{
+    const nv = Math.max(1, parseFloat(fPorz.value)||1);
+    const ratio = nv/(prepPorz||1);
+    if(ratio>0 && ratio!==1){
+      for(const r of subData) r.grammi = +(((Number(r.grammi)||0)*ratio).toFixed(3));
+      const resaN = parseFloat(fResa.value)||0; if(resaN>0) fResa.value = +((resaN*ratio).toFixed(3));
+    }
+    prepPorz = nv; fPorz.value = nv;
+    renderSub();
+  });
 
   const prepPanel = el('div',{class:'card',style:{padding:'12px',background:'var(--side)'}},[
     el('div',{class:'kpi-label',style:{marginBottom:'6px'},text:'COMPOSIZIONE DELLA PREPARAZIONE'}),
     el('p',{class:'muted',style:{fontSize:'12px',margin:'0 0 8px'},text:'Aggiungi gli ingredienti che la compongono: costo e allergeni sono calcolati e propagati in automatico ai piatti che la usano.'}),
     el('div',{class:'row wrap',style:{gap:'8px',marginBottom:'8px'}},[ subPicker ]),
+    el('div',{class:'muted',style:{fontSize:'11px',margin:'4px 0'},text:'oppure crea un nuovo ingrediente al volo (premi Invio per aggiungerlo e passare al successivo):'}),
+    el('div',{class:'row wrap',style:{gap:'6px',marginBottom:'8px'}},[ qpNome, qpUni, qpPrezzo, qpQty, qpBtn ]),
     subBox,
-    el('div',{class:'field',style:{marginTop:'10px'}},[ el('label',{},['Resa — quantità prodotta ', fResaUnit]), fResa,
-      el('span',{class:'hint',text:'Quanto ne ottieni in totale (es. 500). Se 0, uso la somma dei componenti.'}) ]),
+    el('div',{class:'grid-2',style:{marginTop:'10px'}},[
+      el('div',{class:'field'},[ el('label',{text:'Porzioni'}), fPorz,
+        el('span',{class:'hint',text:'Cambiandole, le grammature si riscalano in proporzione.'}) ]),
+      el('div',{class:'field'},[ el('label',{},['Resa — quantità prodotta ', fResaUnit]), fResa,
+        el('span',{class:'hint',text:'Quanto ne ottieni in totale (es. 500). Se 0, uso la somma dei componenti.'}) ]),
+    ]),
     prepPreview,
     el('div',{class:'field',style:{marginTop:'10px'}},[ el('label',{text:'Procedimento della preparazione'}), fPrepProc ]),
   ]);
@@ -341,6 +379,7 @@ function edit(id, prefill={}){
         if(tipo==='preparazione'){
           item.sub  = subData.filter(r=>r.ing_id).map(r=>({ing_id:r.ing_id, grammi:parseFloat(r.grammi)||0}));
           item.resa = parseFloat(fResa.value)||0;
+          item.porzioni = Math.max(1, parseFloat(fPorz.value)||1);
           item.procedimento = fPrepProc.value.trim();
           // i componenti si possono aggiungere anche in un secondo momento
           // snapshot costo (€/unità) + allergeni derivati, per export/altre viste; i piatti ricalcolano comunque live
