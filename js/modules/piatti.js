@@ -156,8 +156,10 @@ function edit(id){
   for(const u of UNITA) qkUni.appendChild(el('option',{value:u,text:u,selected:u==='kg'}));
   const qkPrezzo = el('input',{type:'number',min:'0',step:'0.01',placeholder:'€/unità',style:{maxWidth:'90px'}});
   const qkQty  = el('input',{type:'number',min:'0',step:'1',placeholder:'qty in ricetta',style:{maxWidth:'120px'}});
-  const qkBtn  = el('button',{class:'btn btn-primary',text:'+ Crea e aggiungi',onclick:()=>{
-    const nome = qkNome.value.trim(); if(!nome){ toast('Nome ingrediente obbligatorio','err'); return; }
+
+  // aggiunge l'ingrediente digitato e riporta il focus sul nome per inserire subito il successivo
+  function quickAdd(){
+    const nome = qkNome.value.trim(); if(!nome){ toast('Nome ingrediente obbligatorio','err'); qkNome.focus(); return; }
     const ing = RM.modules.ingredienti.createQuick(nome, {
       unita: qkUni.value,
       prezzo_sicuro: parseFloat(qkPrezzo.value)||0,
@@ -168,12 +170,21 @@ function edit(id){
     refreshPicker();
     renderRec();
     toast(`"${nome}" creato in anagrafica`,'ok');
-  }});
+    qkNome.focus();
+  }
+  const qkBtn  = el('button',{class:'btn btn-primary',text:'+ Crea e aggiungi',onclick:quickAdd});
+
+  // Enter / Shift+Enter in uno qualsiasi dei campi = crea e aggiungi, poi pronto per il prossimo
+  for(const inp of [qkNome, qkPrezzo, qkQty]){
+    inp.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); quickAdd(); }
+    });
+  }
 
   addPanel.append(
     el('div',{class:'kpi-label',style:{marginBottom:'6px'},text:'AGGIUNGI INGREDIENTE'}),
     el('div',{class:'row wrap',style:{gap:'8px',marginBottom:'8px'}},[ ingPicker ]),
-    el('div',{class:'muted',style:{fontSize:'11px',margin:'4px 0'},text:'oppure crealo al volo (lo trovi poi in anagrafica per completare i dettagli):'}),
+    el('div',{class:'muted',style:{fontSize:'11px',margin:'4px 0'},text:'oppure crealo al volo (premi Invio per aggiungerlo e passare subito al successivo):'}),
     el('div',{class:'row wrap',style:{gap:'6px'}},[ qkNome, qkUni, qkPrezzo, qkQty, qkBtn ]),
   );
 

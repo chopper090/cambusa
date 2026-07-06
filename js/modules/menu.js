@@ -68,7 +68,7 @@ function edit(id){
 
   function renderGroups(){
     grpBox.innerHTML='';
-    for(const cat of CATEGORIE_PIATTI){
+    for(const cat of [...CATEGORIE_PIATTI,'altro']){
       const items = grouped[cat]; if(!items?.length) continue;
       const sec = el('div',{style:{marginBottom:'14px'}});
       sec.appendChild(el('h4',{style:{margin:'8px 0 6px',textTransform:'capitalize',color:'var(--text-2)'},text:cat}));
