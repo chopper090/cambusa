@@ -4,13 +4,50 @@ const RM = window.RM = window.RM || {};
 const {pricePerBase} = RM.utils;
 const {store} = RM;
 
+// somma delle quantità (unità base) dei componenti di una preparazione
+function subQtyTotal(sub){ let t=0; for(const r of (sub||[])) t+=Number(r.grammi)||0; return t; }
+
+// costo per UNITÀ BASE (€/g, €/ml, €/pz) di un ingrediente.
+// Per le "preparazioni" (ingredienti composti) è calcolato ricorsivamente dai
+// componenti diviso la resa; guardia anti-ciclo tramite `seen`.
+function unitCost(ing, ingMap, which='sicuro', seen=new Set()){
+  if(!ing) return 0;
+  if(ing.tipo==='preparazione' && Array.isArray(ing.sub) && ing.sub.length && !seen.has(ing.id)){
+    seen.add(ing.id);
+    let tot=0;
+    for(const r of ing.sub){
+      const child = ingMap && ingMap.get(r.ing_id);
+      tot += (Number(r.grammi)||0) * unitCost(child, ingMap, which, seen);
+    }
+    seen.delete(ing.id);
+    const resa = Number(ing.resa)>0 ? Number(ing.resa) : subQtyTotal(ing.sub);
+    return resa>0 ? tot/resa : 0;
+  }
+  const prezzo = which==='medio' ? (Number(ing.prezzo_medio)||0) : (Number(ing.prezzo_sicuro)||0);
+  return pricePerBase(prezzo, ing.unita);
+}
+
+// allergeni effettivi di un ingrediente: i propri + (ricorsivo) quelli dei
+// componenti se è una preparazione. Guardia anti-ciclo tramite `seen`.
+function resolveAllergeni(ing, ingMap, seen=new Set()){
+  if(!ing) return [];
+  const out = new Set(ing.allergeni||[]);
+  if(ing.tipo==='preparazione' && Array.isArray(ing.sub) && !seen.has(ing.id)){
+    seen.add(ing.id);
+    for(const r of ing.sub){
+      const child = ingMap && ingMap.get(r.ing_id);
+      for(const a of resolveAllergeni(child, ingMap, seen)) out.add(a);
+    }
+    seen.delete(ing.id);
+  }
+  return [...out];
+}
+
 // prezzo per unita ingrediente (€/kg, €/L, €/pz). Quantità ricetta in unità base (g, ml, pz).
-function costoRiga(ing, riga){
+function costoRiga(ing, riga, ingMap){
   if(!ing) return {sicuro:0, medio:0};
   const qty = Number(riga.grammi)||0;
-  const pSic = pricePerBase(Number(ing.prezzo_sicuro)||0, ing.unita);
-  const pMed = pricePerBase(Number(ing.prezzo_medio)||0,  ing.unita);
-  return { sicuro: qty*pSic, medio: qty*pMed };
+  return { sicuro: qty*unitCost(ing, ingMap, 'sicuro'), medio: qty*unitCost(ing, ingMap, 'medio') };
 }
 
 function foodcostPiatto(piatto, ingMap){
@@ -20,9 +57,9 @@ function foodcostPiatto(piatto, ingMap){
   for(const r of (piatto.ingredienti||[])){
     const ing = ingMap.get(r.ing_id);
     if(!ing) continue;
-    const c = costoRiga(ing, r);
+    const c = costoRiga(ing, r, ingMap);
     tot_s += c.sicuro; tot_m += c.medio;
-    for(const a of (ing.allergeni||[])) allergeni.add(a);
+    for(const a of resolveAllergeni(ing, ingMap)) allergeni.add(a);
   }
   const cs_porz = tot_s/porz, cm_porz = tot_m/porz;
   const prezzo = Number(piatto.prezzo_vendita)||0;
@@ -57,5 +94,5 @@ function kpiGlobali(){
            foodcost_medio: fcN?fcSum/fcN:0, costo_medio_porz: costN?costSum/costN:0 };
 }
 
-RM.calc = {costoRiga, foodcostPiatto, ingredientiMap, prezzoSuggerito, kpiGlobali};
+RM.calc = {costoRiga, foodcostPiatto, ingredientiMap, prezzoSuggerito, kpiGlobali, unitCost, resolveAllergeni, subQtyTotal};
 })();

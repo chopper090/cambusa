@@ -112,7 +112,7 @@ function edit(id){
 
   const data = id
     ? structuredClone(store.get('piatti', id))
-    : {nome:'',categoria:'',porzioni:1,prezzo_vendita:0,ingredienti:[],procedimento:'',impiattamento:'',tempo_min:0,difficolta:'media',allergeni:[],foto_dataurl:''};
+    : {nome:'',categoria:'',porzioni:1,prezzo_vendita:0,ingredienti:[],procedimento:'',impiattamento:'',tempo_min:0,difficolta:'media',allergeni:[],foto_dataurl:'',in_ricettario:true};
 
   const fNome = el('input',{type:'text',value:data.nome||'',placeholder:'Es. Spaghetti al pomodoro'});
   const fCat  = el('select');
@@ -125,6 +125,7 @@ function edit(id){
   const fTempo  = el('input',{type:'number',min:'0',step:'1',value:data.tempo_min||0});
   const fDiff   = el('select');
   for(const d of ['facile','media','alta']) fDiff.appendChild(el('option',{value:d,text:d,selected:data.difficolta===d}));
+  const fRic    = el('input',{type:'checkbox'}); fRic.checked = data.in_ricettario!==false;
 
   // ricetta box
   const recBox = el('div',{class:'list'});
@@ -140,7 +141,7 @@ function edit(id){
     const ingr = store.all('ingredienti');
     ingPicker.innerHTML='';
     ingPicker.appendChild(el('option',{value:'',text:ingr.length?'+ scegli da anagrafica…':'(nessun ingrediente in anagrafica)'}));
-    for(const i of ingr) ingPicker.appendChild(el('option',{value:i.id,text:`${i.nome}  (${i.unita}, ${fmtEur(i.prezzo_sicuro)})`}));
+    for(const i of ingr) ingPicker.appendChild(el('option',{value:i.id,text:`${i.nome}  (${i.unita}, ${fmtEur(i.prezzo_sicuro)})`+(i.tipo==='preparazione'?' · preparazione':'')}));
   }
   refreshPicker();
   ingPicker.addEventListener('change', e=>{
@@ -208,7 +209,8 @@ function edit(id){
       note.addEventListener('input',()=>{ r.note=note.value; });
       li.append(
         el('div',{class:'grow'},[
-          el('div',{class:'title',text:ing.nome}),
+          el('div',{},[ el('span',{class:'title',text:ing.nome}),
+            ing.tipo==='preparazione'? el('span',{class:'badge acc',style:{marginLeft:'6px',fontSize:'10px'},text:'preparazione'}) : null ]),
           el('div',{class:'sub'},[ `${ing.categoria||'—'} · ${fmtEur(ing.prezzo_sicuro)}/${ing.unita}` ])
         ]),
         qty, el('span',{class:'muted',text:baseUnitLabel(ing.unita)}),
@@ -256,7 +258,13 @@ function edit(id){
       el('div',{class:'field'},[ el('label',{text:'Prezzo di vendita €'}), fPrezzo ]),
       el('div',{class:'field'},[ el('label',{text:'Tempo (min)'}), fTempo ]),
     ]),
-    el('div',{class:'field'},[ el('label',{text:'Difficoltà'}), fDiff ]),
+    el('div',{class:'grid-2'},[
+      el('div',{class:'field'},[ el('label',{text:'Difficoltà'}), fDiff ]),
+      el('div',{class:'field'},[ el('label',{text:'Ricettario'}),
+        el('label',{class:'row',style:{gap:'8px',alignItems:'center',cursor:'pointer',padding:'8px 0'}},[
+          fRic, el('span',{text:'Mostra questo piatto nel Ricettario'}) ]),
+        el('span',{class:'hint',text:'Disattiva per gli assemblaggi (es. panini) che non sono vere ricette.'}) ]),
+    ]),
     el('hr',{class:'sep'}),
     el('h3',{text:'Ricetta'}),
     addPanel,
@@ -284,6 +292,7 @@ function edit(id){
           procedimento: fProc.value.trim(),
           impiattamento: fImpiatt.value.trim(),
           tempo_min: parseFloat(fTempo.value)||0, difficolta: fDiff.value,
+          in_ricettario: fRic.checked,
           foto_dataurl: data.foto_dataurl||'',
         };
         const c = foodcostPiatto(item, getIngMap());

@@ -11,7 +11,7 @@ function mount(r){ render(r); off=onChange(()=>render(r)); }
 function unmount(){ off?.(); off=null; }
 
 function render(root){
-  const piatti = store.all('piatti');
+  const piatti = store.all('piatti').filter(p=>p.in_ricettario!==false);
   const ingMap = ingredientiMap();
   root.innerHTML='';
   root.append(

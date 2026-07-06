@@ -5,7 +5,7 @@ RM.modules = RM.modules || {};
 const {el, toast, confirmDialog, openModal, ALLERGENI, CATEGORIE_INGR, UNITA} = RM.utils;
 const {store, onChange} = RM;
 
-let off=null, root=null, q='', filterCat='', filterAlg='';
+let off=null, root=null, q='', filterCat='', filterAlg='', filterTipo='';
 
 function mount(r){ root=r; render(); off=onChange(k=>{ if(k==='ingredienti'||k==='fornitori') render(); }); }
 function unmount(){ off?.(); off=null; }
@@ -14,10 +14,13 @@ function render(){
   const list = store.all('ingredienti');
   const forn = store.all('fornitori');
   const fornMap = new Map(forn.map(f=>[f.id,f]));
+  const ingMap = new Map(list.map(i=>[i.id,i]));
   const filtered = list.filter(i=>{
     if(q && !(i.nome||'').toLowerCase().includes(q.toLowerCase())) return false;
     if(filterCat && i.categoria!==filterCat) return false;
-    if(filterAlg && !(i.allergeni||[]).includes(filterAlg)) return false;
+    if(filterTipo==='preparazione' && i.tipo!=='preparazione') return false;
+    if(filterTipo==='semplice' && i.tipo==='preparazione') return false;
+    if(filterAlg && !RM.calc.resolveAllergeni(i, ingMap).includes(filterAlg)) return false;
     return true;
   });
   root.innerHTML = '';
@@ -38,24 +41,36 @@ function render(){
           el('p',{class:'muted',text:'Aggiungi ingredienti qui o creali al volo quando inserisci un piatto.'}),
           el('div',{style:{marginTop:'12px'}},[ el('button',{class:'btn btn-primary',text:'+ Nuovo ingrediente',onclick:()=>edit(null)}) ])
         ])])
-      : table(filtered, fornMap)
+      : table(filtered, fornMap, ingMap)
   );
 }
 
 function filterBar(){
   const wrap = el('div',{class:'row wrap',style:{marginBottom:'12px'}});
+  const tipo = el('select',{onchange:e=>{filterTipo=e.target.value;render();},style:{maxWidth:'170px'}});
+  for(const [v,t] of [['','Tutti i tipi'],['semplice','Solo materie prime'],['preparazione','Solo preparazioni']])
+    tipo.appendChild(el('option',{value:v,text:t,selected:filterTipo===v}));
   const cat = el('select',{onchange:e=>{filterCat=e.target.value;render();},style:{maxWidth:'180px'}});
   cat.appendChild(el('option',{value:'',text:'Tutte le categorie'}));
   for(const c of CATEGORIE_INGR) cat.appendChild(el('option',{value:c,text:c,selected:filterCat===c}));
   const alg = el('select',{onchange:e=>{filterAlg=e.target.value;render();},style:{maxWidth:'180px'}});
   alg.appendChild(el('option',{value:'',text:'Tutti gli allergeni'}));
   for(const a of ALLERGENI) alg.appendChild(el('option',{value:a,text:a,selected:filterAlg===a}));
-  wrap.append(cat, alg);
-  if(filterCat||filterAlg||q) wrap.appendChild(el('button',{class:'btn btn-ghost btn-sm',text:'azzera filtri',onclick:()=>{q='';filterCat='';filterAlg='';render();}}));
+  wrap.append(tipo, cat, alg);
+  if(filterCat||filterAlg||filterTipo||q) wrap.appendChild(el('button',{class:'btn btn-ghost btn-sm',text:'azzera filtri',onclick:()=>{q='';filterCat='';filterAlg='';filterTipo='';render();}}));
   return wrap;
 }
 
-function table(list, fornMap){
+// prezzo per unità (€/kg, €/L, €/pz) da mostrare in tabella: calcolato per le preparazioni
+function displayPrice(i, ingMap, which){
+  if(i.tipo==='preparazione'){
+    const perBase = RM.calc.unitCost(i, ingMap, which);       // €/g, €/ml, €/pz
+    return (i.unita==='kg'||i.unita==='L') ? perBase*1000 : perBase; // → €/unità
+  }
+  return which==='medio' ? i.prezzo_medio : i.prezzo_sicuro;
+}
+
+function table(list, fornMap, ingMap){
   const {fmtEur} = RM.utils;
   const tb = el('div',{class:'tbl-wrap'});
   const t = el('table',{class:'tbl'});
@@ -66,13 +81,17 @@ function table(list, fornMap){
   ])]));
   const tbody = el('tbody');
   for(const i of list){
-    const algs = (i.allergeni||[]).map(a=>el('span',{class:'badge',text:a}));
+    const isPrep = i.tipo==='preparazione';
+    const algs = RM.calc.resolveAllergeni(i, ingMap).map(a=>el('span',{class:'badge',text:a}));
     const row = el('tr',{},[
-      el('td',{},[ el('div',{},[ el('b',{text:i.nome||'—'}), i.note?el('div',{class:'muted',style:{fontSize:'12px'},text:i.note}):null ]) ]),
+      el('td',{},[ el('div',{},[
+        el('b',{text:i.nome||'—'}),
+        isPrep? el('span',{class:'badge acc',style:{marginLeft:'6px',fontSize:'10px'},text:'preparazione'}) : null,
+        i.note?el('div',{class:'muted',style:{fontSize:'12px'},text:i.note}):null ]) ]),
       el('td',{},[ i.categoria? el('span',{class:'chip',text:i.categoria}) : el('span',{class:'muted',text:'—'}) ]),
       el('td',{text:i.unita||'—'}),
-      el('td',{class:'num',text:fmtEur(i.prezzo_sicuro)}),
-      el('td',{class:'num muted',text:fmtEur(i.prezzo_medio)}),
+      el('td',{class:'num',text:fmtEur(displayPrice(i,ingMap,'sicuro'))}),
+      el('td',{class:'num muted',text:fmtEur(displayPrice(i,ingMap,'medio'))}),
       el('td',{},[ i.fornitore_id && fornMap.get(i.fornitore_id) ? el('span',{class:'chip',text:fornMap.get(i.fornitore_id).nome}) : el('span',{class:'muted',text:'—'}) ]),
       el('td',{},[ el('div',{class:'chips'}, algs.length?algs:[el('span',{class:'muted',text:'—'})]) ]),
       el('td',{class:'actions'},[
@@ -94,7 +113,7 @@ async function del(i){
 }
 
 function edit(id, prefill={}){
-  const data = id ? {...store.get('ingredienti', id)} : {nome:'',categoria:'',unita:'kg',prezzo_sicuro:0,prezzo_medio:0,fornitore_id:'',allergeni:[],note:'',...prefill};
+  const data = id ? {...store.get('ingredienti', id)} : {nome:'',categoria:'',unita:'kg',prezzo_sicuro:0,prezzo_medio:0,fornitore_id:'',allergeni:[],note:'',tipo:'semplice',sub:[],resa:0,procedimento:'',...prefill};
   const forn = store.all('fornitori');
 
   const fNome = el('input',{type:'text',value:data.nome||'',placeholder:'Es. Pomodoro San Marzano',autocomplete:'off'});
@@ -166,35 +185,150 @@ function edit(id, prefill={}){
   };
   redrawAlg();
 
+  // === TIPO: materia prima vs preparazione (ingrediente composto) ===
+  const fTipo = el('select');
+  for(const [v,t] of [['semplice','Materia prima'],['preparazione','Preparazione (ha una sua ricetta)']])
+    fTipo.appendChild(el('option',{value:v,text:t,selected:(data.tipo||'semplice')===v}));
+
+  // ---- pannello preparazione: sotto-ingredienti + resa + anteprima costo/allergeni ----
+  const subData = Array.isArray(data.sub) ? data.sub.map(r=>({ing_id:r.ing_id, grammi:r.grammi||0})) : [];
+  const fResa = el('input',{type:'number',min:'0',step:'1',value:data.resa||0,style:{maxWidth:'140px'}});
+  const fResaUnit = el('span',{class:'muted'});
+  const fPrepProc = el('textarea',{value:data.procedimento||'',placeholder:'Procedimento della preparazione (facoltativo)…',style:{minHeight:'70px'}});
+  const subBox = el('div',{class:'list'});
+  const subPicker = el('select',{style:{flex:'1'}});
+  const prepPreview = el('div',{class:'row wrap',style:{gap:'14px',marginTop:'10px'}});
+  const ingMapNow = ()=> new Map(store.all('ingredienti').map(i=>[i.id,i]));
+
+  function refreshSubPicker(){
+    const all = store.all('ingredienti').filter(i=>i.id!==data.id); // niente auto-riferimento
+    subPicker.innerHTML='';
+    subPicker.appendChild(el('option',{value:'',text: all.length?'+ aggiungi componente…':'(nessun altro ingrediente)'}));
+    for(const i of all) subPicker.appendChild(el('option',{value:i.id,text:`${i.nome} (${i.unita})`+(i.tipo==='preparazione'?' · prep':'')}));
+  }
+  subPicker.addEventListener('change', e=>{
+    const cid=e.target.value; if(!cid) return;
+    if(subData.some(r=>r.ing_id===cid)){ toast('Già presente','err'); e.target.value=''; return; }
+    subData.push({ing_id:cid, grammi:0}); e.target.value=''; renderSub();
+  });
+  function subRm(idx){ return el('button',{class:'btn btn-sm btn-danger',text:'×',title:'Rimuovi',onclick:()=>{ subData.splice(idx,1); renderSub(); }}); }
+  function renderSub(){
+    subBox.innerHTML='';
+    if(!subData.length) subBox.appendChild(el('div',{class:'drop',text:'Nessun componente. Aggiungi gli ingredienti che compongono la preparazione ↑'}));
+    const map = ingMapNow();
+    subData.forEach((r,idx)=>{
+      const ing = map.get(r.ing_id);
+      const li = el('div',{class:'list-item'});
+      if(!ing){ li.append(el('div',{class:'grow'},[el('span',{class:'badge err',text:'non trovato'})]), subRm(idx)); subBox.appendChild(li); return; }
+      const qty = el('input',{type:'number',min:'0',step:'1',value:r.grammi||0,style:{maxWidth:'90px'}});
+      qty.addEventListener('input',()=>{ r.grammi=parseFloat(qty.value)||0; recalcPrep(); });
+      li.append(
+        el('div',{class:'grow'},[ el('div',{class:'title',text:ing.nome}),
+          el('div',{class:'sub',text:`${ing.categoria||'—'}`+(ing.tipo==='preparazione'?' · preparazione':'')}) ]),
+        qty, el('span',{class:'muted',text:baseUnitLabel(ing.unita)}), subRm(idx)
+      );
+      subBox.appendChild(li);
+    });
+    recalcPrep();
+  }
+  const {baseUnitLabel} = RM.utils;
+  function kpiBox(label,val){ return el('div',{class:'kpi'},[el('span',{class:'kpi-label',text:label}),el('span',{style:{fontSize:'15px',fontWeight:'600'},text:val})]); }
+  function recalcPrep(){
+    fResaUnit.textContent = baseUnitLabel(fUni.value);
+    const key = data.id||'__new__';
+    const virt = {id:key, tipo:'preparazione', unita:fUni.value, sub:subData, resa:parseFloat(fResa.value)||0, allergeni:[...algState]};
+    const map = ingMapNow(); map.set(key, virt);
+    const perBaseS = RM.calc.unitCost(virt, map, 'sicuro');
+    const perUnitS = (fUni.value==='kg'||fUni.value==='L')?perBaseS*1000:perBaseS;
+    const resaEff = (parseFloat(fResa.value)||RM.calc.subQtyTotal(subData)||0);
+    const alg = RM.calc.resolveAllergeni(virt, map);
+    prepPreview.innerHTML='';
+    prepPreview.append(
+      kpiBox('Costo totale', RM.utils.fmtEur(perBaseS*resaEff)),
+      kpiBox('Costo / '+fUni.value, RM.utils.fmtEur(perUnitS)),
+      kpiBox('Allergeni', alg.length?alg.join(', '):'—'),
+    );
+  }
+  fResa.addEventListener('input', recalcPrep);
+  fUni.addEventListener('change', recalcPrep);
+
+  const prepPanel = el('div',{class:'card',style:{padding:'12px',background:'var(--side)'}},[
+    el('div',{class:'kpi-label',style:{marginBottom:'6px'},text:'COMPOSIZIONE DELLA PREPARAZIONE'}),
+    el('p',{class:'muted',style:{fontSize:'12px',margin:'0 0 8px'},text:'Aggiungi gli ingredienti che la compongono: costo e allergeni sono calcolati e propagati in automatico ai piatti che la usano.'}),
+    el('div',{class:'row wrap',style:{gap:'8px',marginBottom:'8px'}},[ subPicker ]),
+    subBox,
+    el('div',{class:'field',style:{marginTop:'10px'}},[ el('label',{},['Resa — quantità prodotta ', fResaUnit]), fResa,
+      el('span',{class:'hint',text:'Quanto ne ottieni in totale (es. 500). Se 0, uso la somma dei componenti.'}) ]),
+    prepPreview,
+    el('div',{class:'field',style:{marginTop:'10px'}},[ el('label',{text:'Procedimento della preparazione'}), fPrepProc ]),
+  ]);
+
+  const priceWrap = el('div',{class:'grid-2'},[
+    el('div',{class:'field'},[ el('label',{text:'€ sicuro (fornitore)'}), fPs ]),
+    el('div',{class:'field'},[ el('label',{text:'€ medio (stima nazionale)'}), fPm ]),
+  ]);
+  const fornWrap = el('div',{class:'field'},[ el('label',{text:'Fornitore'}), fForn ]);
+  const algLabel = el('label',{text:'Allergeni'});
+
+  function applyTipo(){
+    const prep = fTipo.value==='preparazione';
+    priceWrap.style.display = prep?'none':'';
+    fornWrap.style.display  = prep?'none':'';
+    prepPanel.style.display = prep?'':'none';
+    algLabel.textContent = prep ? 'Allergeni aggiuntivi (oltre a quelli calcolati dai componenti)' : 'Allergeni';
+    if(prep){ refreshSubPicker(); renderSub(); }
+  }
+  fTipo.addEventListener('change', applyTipo);
+
   const body = el('div',{},[
     el('div',{class:'grid-2'},[
       el('div',{class:'field'},[ el('label',{text:'Nome *'}), acWrap,
         el('span',{class:'hint',text:`Inizia a digitare: cerco fra ${RM.kbPrezzi.count} ingredienti comuni e compilo categoria, unità e prezzo medio.`}) ]),
-      el('div',{class:'field'},[ el('label',{text:'Categoria'}), fCat ]),
+      el('div',{class:'field'},[ el('label',{text:'Tipo'}), fTipo ]),
     ]),
-    el('div',{class:'grid-3'},[
+    el('div',{class:'grid-2'},[
+      el('div',{class:'field'},[ el('label',{text:'Categoria'}), fCat ]),
       el('div',{class:'field'},[ el('label',{text:'Unità di misura'}), fUni,
         el('span',{class:'hint',text:'Il prezzo è per €/kg, €/L o €/pz.'}) ]),
-      el('div',{class:'field'},[ el('label',{text:'€ sicuro (fornitore)'}), fPs ]),
-      el('div',{class:'field'},[ el('label',{text:'€ medio (stima nazionale)'}), fPm ]),
     ]),
-    el('div',{class:'field'},[ el('label',{text:'Fornitore'}), fForn ]),
-    el('div',{class:'field'},[ el('label',{text:'Allergeni'}), fAlg ]),
+    priceWrap,
+    prepPanel,
+    fornWrap,
+    el('div',{class:'field'},[ algLabel, fAlg ]),
     el('div',{class:'field'},[ el('label',{text:'Note'}), fNote ]),
   ]);
+  applyTipo();
 
   const {close} = openModal({
     title: id?'Modifica ingrediente':'Nuovo ingrediente', body,
     footer:[
       el('button',{class:'btn',text:'Annulla',onclick:()=>close()}),
       el('button',{class:'btn btn-primary',text:'Salva',onclick:()=>{
+        const tipo = fTipo.value==='preparazione' ? 'preparazione' : 'semplice';
         const item = {
           ...(data.id?{id:data.id}:{}),
-          nome: fNome.value.trim(), categoria: fCat.value, unita: fUni.value,
-          prezzo_sicuro: parseFloat(fPs.value)||0, prezzo_medio: parseFloat(fPm.value)||0,
-          fornitore_id: fForn.value||'', allergeni: [...algState], note: fNote.value.trim(),
+          nome: fNome.value.trim(), categoria: fCat.value, unita: fUni.value, tipo,
+          fornitore_id: tipo==='preparazione' ? '' : (fForn.value||''),
+          allergeni: [...algState], note: fNote.value.trim(),
         };
         if(!item.nome){ toast('Nome obbligatorio','err'); return; }
+        if(tipo==='preparazione'){
+          item.sub  = subData.filter(r=>r.ing_id).map(r=>({ing_id:r.ing_id, grammi:parseFloat(r.grammi)||0}));
+          item.resa = parseFloat(fResa.value)||0;
+          item.procedimento = fPrepProc.value.trim();
+          if(!item.sub.length){ toast('Aggiungi almeno un componente alla preparazione','err'); return; }
+          // snapshot costo (€/unità) + allergeni derivati, per export/altre viste; i piatti ricalcolano comunque live
+          const key = item.id || '__tmp__';
+          const map = new Map(store.all('ingredienti').map(i=>[i.id,i])); map.set(key, {...item, id:key});
+          const f = (item.unita==='kg'||item.unita==='L') ? 1000 : 1;
+          item.prezzo_sicuro = +(RM.calc.unitCost(map.get(key), map, 'sicuro')*f).toFixed(4);
+          item.prezzo_medio  = +(RM.calc.unitCost(map.get(key), map, 'medio')*f).toFixed(4);
+          item.allergeni     = RM.calc.resolveAllergeni(map.get(key), map);
+        } else {
+          item.prezzo_sicuro = parseFloat(fPs.value)||0;
+          item.prezzo_medio  = parseFloat(fPm.value)||0;
+          item.sub = []; item.resa = 0;
+        }
         store.upsert('ingredienti', item);
         toast('Ingrediente salvato','ok');
         close();

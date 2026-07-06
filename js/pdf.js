@@ -17,7 +17,7 @@ function wrap(doc, text, maxW){ return doc.splitTextToSize(text||'', maxW); }
 // ===== Ricettario =====
 function esportaRicettario(){
   const J = jspdf(); if(!J) return;
-  const piatti = store.all('piatti');
+  const piatti = store.all('piatti').filter(p=>p.in_ricettario!==false);
   if(!piatti.length){ toast('Nessun piatto da esportare','err'); return; }
   const ingMap = ingredientiMap();
   const settings = store.getSettings();
