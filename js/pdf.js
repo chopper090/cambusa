@@ -119,7 +119,7 @@ function esportaMenu(menuId){
   if(!piatti.length){ toast('Nessun piatto nel menù','err'); return; }
 
   const doc = new J({unit:'mm',format:'a4'});
-  const ORD = ['antipasto','primo','secondo','contorno','dolce','bevanda','pane','altro'];
+  const ORD = ['Piazzetta','Salse','Buns','Crostoni','Sfizi','Insalatine','Piatti','Signature','altro'];
   const groups = new Map(ORD.map(c=>[c,[]]));
   for(const p of piatti){ const k=groups.has(p.categoria)?p.categoria:'altro'; groups.get(k).push(p); }
 
@@ -140,7 +140,7 @@ function esportaMenu(menuId){
     const list = groups.get(cat); if(!list?.length) continue;
     if(y>250){ doc.addPage(); y=30; }
     doc.setFont('times','bold').setFontSize(18).setTextColor(COL.text);
-    const title = cat.charAt(0).toUpperCase()+cat.slice(1)+(list.length>1?'i':'');
+    const title = cat.charAt(0).toUpperCase()+cat.slice(1);
     doc.text(title, 105, y, {align:'center'}); y+=2;
     doc.setDrawColor(COL.light).line(70,y+2,140,y+2); y+=10;
     for(const p of list){

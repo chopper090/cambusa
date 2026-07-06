@@ -51,9 +51,9 @@ function buildFromMenu(m){
   const grouped={}; for(const c of CATEGORIE_PIATTI) grouped[c]=[]; grouped['altro']=[];
   for(const p of piatti){ const k=grouped[p.categoria]?p.categoria:'altro'; grouped[k].push(p); }
   let y=205;
-  for(const cat of CATEGORIE_PIATTI){
+  for(const cat of [...CATEGORIE_PIATTI,'altro']){
     const list=grouped[cat]; if(!list?.length) continue;
-    items.push({id:rid(),type:'text',x:M,y,w:W,h:32,z:5,rot:0,text:cat.charAt(0).toUpperCase()+cat.slice(1)+(list.length>1?'i':''),style:{fontFamily:fDisp,fontSize:22,color:ink,align:'center',weight:700,italic:false,lineHeight:1.2,transform:tr}});
+    items.push({id:rid(),type:'text',x:M,y,w:W,h:32,z:5,rot:0,text:cat.charAt(0).toUpperCase()+cat.slice(1),style:{fontFamily:fDisp,fontSize:22,color:ink,align:'center',weight:700,italic:false,lineHeight:1.2,transform:tr}});
     y+=40;
     for(const p of list){ items.push({id:rid(),type:'dish',x:M,y,w:W,h:48,z:6,rot:0,dishId:p.id,showPrice:true,showDesc:true,style:{...dishStyle}}); y+=54; if(y>1040){break;} }
     y+=14; if(y>1040) break;

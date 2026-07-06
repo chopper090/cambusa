@@ -169,6 +169,17 @@ function mount(root){
         el('label',{class:'btn',text:'↧ Importa backup'},[fRestore]),
       ]),
     ]),
+    el('div',{class:'card',style:{marginTop:'14px'}},[
+      el('h2',{text:'Menù della Carta'}),
+      el('p',{class:'muted',style:{marginBottom:'12px',fontSize:'12.5px'},text:'Carica il menù completo (Piazzetta, Salse, Buns, Crostoni, Sfizi, Insalatine, Piatti, Signature) su questo ristorante. Aggiorna la categoria dei piatti già presenti e aggiunge quelli mancanti con ingredienti e allergeni. Non crea doppioni: puoi premerlo più volte in sicurezza.'}),
+      el('button',{class:'btn btn-primary',text:'↧ Carica / aggiorna menù della Carta',onclick:async()=>{
+        const nm = store.getActive()?.name || 'questo ristorante';
+        if(!await confirmDialog(`Caricare/aggiornare il menù della Carta su “${nm}”? I piatti esistenti verranno ricategorizzati e quelli mancanti aggiunti. Nessun doppione.`,'Carica menù')) return;
+        const {fixedCat, addedDish} = RM.modules.seedCarta.run();
+        toast(`Menù aggiornato: ${addedDish} piatti aggiunti, ${fixedCat} ricategorizzati`,'ok');
+        location.hash = '#piatti';
+      }}),
+    ]),
     el('div',{class:'row',style:{marginTop:'18px'}},[
       el('button',{class:'btn btn-primary',text:'Salva impostazioni',onclick:()=>{
         store.setSettings({

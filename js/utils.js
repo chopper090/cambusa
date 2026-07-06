@@ -75,7 +75,7 @@ const ALLERGENI = [
   'glutine','crostacei','uova','pesce','arachidi','soia','latticini',
   'frutta a guscio','sedano','senape','sesamo','solfiti','lupini','molluschi'
 ];
-const CATEGORIE_PIATTI = ['antipasto','primo','secondo','contorno','dolce','bevanda','pane','altro'];
+const CATEGORIE_PIATTI = ['Piazzetta','Salse','Buns','Crostoni','Sfizi','Insalatine','Piatti','Signature'];
 const CATEGORIE_INGR  = ['verdura','ortaggi','frutta','frutta secca','carne','pesce','latticini','salumi','uova','farinacei','legumi','riso e cereali','secco e polveri','oli','aceti','condimenti','conserve','bevande','spezie','dolci','altro'];
 
 // HACCP — simboli normativi (ISO 5807 + HACCP standard)
