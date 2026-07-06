@@ -214,7 +214,7 @@ function edit(id, prefill={}){
   function subRm(idx){ return el('button',{class:'btn btn-sm btn-danger',text:'×',title:'Rimuovi',onclick:()=>{ subData.splice(idx,1); renderSub(); }}); }
   function renderSub(){
     subBox.innerHTML='';
-    if(!subData.length) subBox.appendChild(el('div',{class:'drop',text:'Nessun componente. Aggiungi gli ingredienti che compongono la preparazione ↑'}));
+    if(!subData.length) subBox.appendChild(el('div',{class:'drop',text:'Nessun componente. Puoi salvare così e aggiungerli anche più tardi ↑'}));
     const map = ingMapNow();
     subData.forEach((r,idx)=>{
       const ing = map.get(r.ing_id);
@@ -316,7 +316,7 @@ function edit(id, prefill={}){
           item.sub  = subData.filter(r=>r.ing_id).map(r=>({ing_id:r.ing_id, grammi:parseFloat(r.grammi)||0}));
           item.resa = parseFloat(fResa.value)||0;
           item.procedimento = fPrepProc.value.trim();
-          if(!item.sub.length){ toast('Aggiungi almeno un componente alla preparazione','err'); return; }
+          // i componenti si possono aggiungere anche in un secondo momento
           // snapshot costo (€/unità) + allergeni derivati, per export/altre viste; i piatti ricalcolano comunque live
           const key = item.id || '__tmp__';
           const map = new Map(store.all('ingredienti').map(i=>[i.id,i])); map.set(key, {...item, id:key});
