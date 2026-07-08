@@ -43,7 +43,9 @@ async function ghFetch(url, opts={}){
   if(!res.ok){
     let msg = res.status+' '+res.statusText;
     try{ const j=await res.json(); if(j && j.message) msg=res.status+' — '+j.message; }catch(e){}
-    if(res.status===401) msg='token non valido o scaduto';
+    if(res.status===401) msg='token rifiutato — usa un token CLASSIC con permesso “gist”. I token “fine-grained” NON funzionano con i Gist.';
+    else if(res.status===403) msg='accesso negato — il token deve avere il permesso “gist” (oppure limite richieste raggiunto, riprova tra poco).';
+    else if(res.status===404) msg='non trovato — token senza permesso “gist” o Gist inesistente.';
     throw new Error(msg);
   }
   return res;
