@@ -214,6 +214,31 @@ const store = {
     notify('__app__'); for(const k of KEYS) notify(k);
     return true;
   },
+
+  // ===== Trasferimento dati tra ristoranti =====
+  // Copia (o sposta) i contenuti da un ristorante all'altro SENZA toccare le
+  // impostazioni (nome, stile, loghi) del ristorante di destinazione.
+  // Merge per id: gli elementi già presenti nel target non vengono duplicati.
+  // Ritorna un riepilogo {ingredienti, piatti, menu, ...} con i conteggi aggiunti.
+  CONTENT_KEYS: ['ingredienti','fornitori','piatti','menu','haccp','giacenze'],
+  transferData(fromId, toId, opts={}){
+    if(!fromId || !toId || fromId===toId) return null;
+    if(!appMeta.restaurants.some(r=>r.id===fromId) || !appMeta.restaurants.some(r=>r.id===toId)) return null;
+    const summary = {};
+    for(const k of this.CONTENT_KEYS){
+      const src = readFor(fromId,k);
+      if(!Array.isArray(src)){ continue; }
+      const dst = readFor(toId,k);
+      const seen = new Set(dst.map(x=>x && x.id));
+      let added=0;
+      for(const item of src){ if(item && !seen.has(item.id)){ dst.push(item); seen.add(item.id); added++; } }
+      writeFor(toId,k,dst);
+      if(opts.move) writeFor(fromId,k,structuredClone(defaults[k]));
+      summary[k]=added;
+    }
+    notify('__app__'); for(const k of this.CONTENT_KEYS) notify(k);
+    return summary;
+  },
 };
 
 RM.store = store;

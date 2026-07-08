@@ -117,6 +117,32 @@ function mount(root){
   refreshBrandingPickers();
 
   const active = store.getActive();
+
+  // === Sposta dati tra ristoranti ===
+  const rests = store.getRestaurants();
+  const fFrom = el('select');
+  const fTo   = el('select');
+  for(const r of rests){
+    fFrom.appendChild(el('option',{value:r.id,text:r.name,selected:r.id===active?.id}));
+    fTo.appendChild(el('option',{value:r.id,text:r.name}));
+  }
+  // destinazione predefinita: il primo ristorante diverso dall'origine
+  const firstOther = rests.find(r=>r.id!==active?.id); if(firstOther) fTo.value=firstOther.id;
+  const fMove = el('input',{type:'checkbox'});
+  async function doTransfer(){
+    const fromId=fFrom.value, toId=fTo.value;
+    if(fromId===toId){ toast('Scegli due ristoranti diversi','err'); return; }
+    const fromN = rests.find(r=>r.id===fromId)?.name||'origine';
+    const toN   = rests.find(r=>r.id===toId)?.name||'destinazione';
+    const move  = fMove.checked;
+    const azione = move?'SPOSTARE':'copiare';
+    if(!await confirmDialog(`Vuoi ${azione} tutti i dati (piatti, ingredienti, preparazioni, menù, fornitori, HACCP, giacenze) da “${fromN}” a “${toN}”?${move?` I dati verranno RIMOSSI da “${fromN}”.`:''} Nome, stile e loghi di “${toN}” restano invariati. Nessun doppione.`, move?'Sposta dati':'Copia dati')) return;
+    const s = store.transferData(fromId, toId, {move});
+    if(!s){ toast('Trasferimento non riuscito','err'); return; }
+    const tot = Object.values(s).reduce((a,b)=>a+b,0);
+    toast(`${tot} elementi trasferiti su “${toN}” (piatti ${s.piatti||0}, ingredienti ${s.ingredienti||0}, menù ${s.menu||0})`,'ok');
+  }
+
   root.innerHTML='';
   root.append(
     el('div',{class:'view-head'},[el('h1',{text:'Impostazioni'})]),
@@ -179,6 +205,17 @@ function mount(root){
         toast(`Menù aggiornato: ${addedDish} piatti aggiunti, ${fixedCat} ricategorizzati`,'ok');
         location.hash = '#piatti';
       }}),
+    ]),
+    el('div',{class:'card',style:{marginTop:'14px'}},[
+      el('h2',{text:'Sposta dati tra ristoranti'}),
+      el('p',{class:'muted',style:{marginBottom:'12px',fontSize:'12.5px'},text:'Copia o sposta piatti, ingredienti, preparazioni, menù, fornitori, HACCP e giacenze da un ristorante all\'altro. Nome, stile e loghi del ristorante di destinazione restano invariati; i collegamenti (ricette, allergeni) sono preservati. Non crea doppioni.'}),
+      el('div',{class:'grid-2'},[
+        el('div',{class:'field'},[ el('label',{text:'Da (origine)'}), fFrom ]),
+        el('div',{class:'field'},[ el('label',{text:'A (destinazione)'}), fTo ]),
+      ]),
+      el('label',{class:'row',style:{gap:'8px',alignItems:'center',cursor:'pointer',margin:'8px 0'}},[
+        fMove, el('span',{text:'Svuota il ristorante di origine dopo lo spostamento (altrimenti resta una copia)'}) ]),
+      el('button',{class:'btn btn-primary',text:'Trasferisci dati',onclick:doTransfer}),
     ]),
     el('div',{class:'row',style:{marginTop:'18px'}},[
       el('button',{class:'btn btn-primary',text:'Salva impostazioni',onclick:()=>{
