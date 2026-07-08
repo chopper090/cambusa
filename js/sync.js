@@ -34,18 +34,23 @@ const listeners=new Set();
 const emit = s => { for(const fn of listeners) try{fn(s);}catch(e){} };
 
 async function ghFetch(url, opts={}){
-  const res = await fetch(url, {...opts, headers:{
+  // cache-busting: mai usare la cache (alcune app wrapper servono vecchie
+  // risposte 401 dell'endpoint /gists → sync sempre fallita nonostante token valido)
+  const sep = url.includes('?') ? '&' : '?';
+  const res = await fetch(url+sep+'_ts='+Date.now(), {...opts, cache:'no-store', headers:{
     'Authorization':'Bearer '+cfg.token,
     'Accept':'application/vnd.github+json',
     'X-GitHub-Api-Version':'2022-11-28',
+    'Cache-Control':'no-cache',
     ...(opts.headers||{}),
   }});
   if(!res.ok){
+    const op = (opts.method||'GET')+' '+url.replace(API,'');
     let msg = res.status+' '+res.statusText;
     try{ const j=await res.json(); if(j && j.message) msg=res.status+' — '+j.message; }catch(e){}
-    if(res.status===401) msg='token rifiutato — usa un token CLASSIC con permesso “gist”. I token “fine-grained” NON funzionano con i Gist.';
-    else if(res.status===403) msg='accesso negato — il token deve avere il permesso “gist” (oppure limite richieste raggiunto, riprova tra poco).';
-    else if(res.status===404) msg='non trovato — token senza permesso “gist” o Gist inesistente.';
+    if(res.status===401) msg='401 su '+op+' — token rifiutato. Usa un token CLASSIC con permesso “gist” (i “fine-grained” non funzionano).';
+    else if(res.status===403) msg='403 su '+op+' — permesso “gist” mancante o limite richieste raggiunto.';
+    else if(res.status===404) msg='404 su '+op+' — Gist inesistente o token senza permesso “gist”.';
     throw new Error(msg);
   }
   return res;
@@ -89,7 +94,7 @@ async function fetchRemote(){
   const f = data.files && data.files[FILE];
   if(!f) return null;
   let content = f.content;
-  if(f.truncated && f.raw_url){ content = await (await fetch(f.raw_url)).text(); }
+  if(f.truncated && f.raw_url){ content = await (await fetch(f.raw_url, {cache:'no-store'})).text(); }
   try{ return JSON.parse(content); }catch(e){ return null; }
 }
 
@@ -111,8 +116,8 @@ async function pull(){
 // diagnostica: verifica il token SALVATO SU QUESTO DISPOSITIVO
 async function verify(){
   if(!cfg.token) throw new Error('nessun token salvato su questo dispositivo');
-  const res = await fetch(API+'/user', {headers:{
-    'Authorization':'Bearer '+cfg.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' }});
+  const res = await fetch(API+'/user?_ts='+Date.now(), {cache:'no-store', headers:{
+    'Authorization':'Bearer '+cfg.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28', 'Cache-Control':'no-cache' }});
   if(res.status===401) throw new Error('401 — il token salvato QUI non è valido. Probabilmente è ancora quello vecchio: reincollalo e premi “Salva token”.');
   if(!res.ok) throw new Error(res.status+' '+res.statusText);
   const u = await res.json();
