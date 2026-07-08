@@ -108,6 +108,22 @@ async function pull(){
   applyRemote(remote);
 }
 
+// diagnostica: verifica il token SALVATO SU QUESTO DISPOSITIVO
+async function verify(){
+  if(!cfg.token) throw new Error('nessun token salvato su questo dispositivo');
+  const res = await fetch(API+'/user', {headers:{
+    'Authorization':'Bearer '+cfg.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' }});
+  if(res.status===401) throw new Error('401 — il token salvato QUI non è valido. Probabilmente è ancora quello vecchio: reincollalo e premi “Salva token”.');
+  if(!res.ok) throw new Error(res.status+' '+res.statusText);
+  const u = await res.json();
+  const raw = res.headers.get('x-oauth-scopes'); // null se non esposto dal browser
+  const scopes = raw==null ? null : raw.split(',').map(s=>s.trim()).filter(Boolean);
+  const hasGist = scopes==null ? null : scopes.includes('gist');
+  return { login:u.login, scopes, hasGist };
+}
+
+function clearToken(){ cfg.token=''; cfg.gistId=''; cfg.localUpdatedAt=0; cfg.syncedUpdatedAt=0; }
+
 // confronto per timestamp: pull se remoto più recente, push se locale più recente
 async function syncNow(){
   if(busy) return {skipped:true};
@@ -153,7 +169,7 @@ async function init(){
 }
 
 RM.sync = {
-  cfg, push, pull, syncNow,
+  cfg, push, pull, syncNow, verify, clearToken,
   onState: fn => { listeners.add(fn); return ()=>listeners.delete(fn); },
   status(){ return { hasToken:!!cfg.token, gistId:cfg.gistId, auto:cfg.auto,
     localUpdatedAt:cfg.localUpdatedAt, syncedUpdatedAt:cfg.syncedUpdatedAt }; },
