@@ -119,17 +119,32 @@
 <!-- Service Worker (registrato solo su http(s)://, ignorato su file://) -->
 <script>
 if('serviceWorker' in navigator && (location.protocol==='https:' || location.protocol==='http:')){
+  let updating=false, refreshing=false;
+  // quando il nuovo service worker prende il controllo, ricarica una volta sola
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+    if(!updating || refreshing) return; refreshing=true; location.reload();
+  });
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('sw.js').then(reg=>{
+      // controlla aggiornamenti all'avvio, ogni 60s e al ritorno in primo piano
+      const check = ()=>{ reg.update().catch(()=>{}); };
+      check();
+      setInterval(check, 60000);
+      document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') check(); });
+      // se all'avvio c'è già una versione in attesa, applicala
+      if(reg.waiting && navigator.serviceWorker.controller){ updating=true; reg.waiting.postMessage('skipWaiting'); }
       reg.addEventListener('updatefound', ()=>{
         const nw = reg.installing;
         if(!nw) return;
         nw.addEventListener('statechange', ()=>{
           if(nw.state==='installed' && navigator.serviceWorker.controller){
+            // applica automaticamente la nuova versione (poi si ricarica da solo)
+            updating=true; nw.postMessage('skipWaiting');
             const b = document.getElementById('update-banner');
             if(b){
               b.style.display='block';
-              document.getElementById('update-now').onclick=()=>{ nw.postMessage('skipWaiting'); location.reload(); };
+              const btn=document.getElementById('update-now');
+              if(btn) btn.onclick=()=>{ nw.postMessage('skipWaiting'); location.reload(); };
             }
           }
         });
