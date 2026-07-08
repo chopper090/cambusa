@@ -143,6 +143,32 @@ function mount(root){
     toast(`${tot} elementi trasferiti su “${toN}” (piatti ${s.piatti||0}, ingredienti ${s.ingredienti||0}, menù ${s.menu||0})`,'ok');
   }
 
+  // === Sincronizzazione (GitHub Gist) ===
+  const fToken = el('input',{type:'password',value:'',autocomplete:'off',placeholder: RM.sync?.cfg.token ? 'token già impostato — incolla per sostituirlo' : 'ghp_… (token con permesso gist)'});
+  const fAuto  = el('input',{type:'checkbox'}); fAuto.checked = !!RM.sync?.cfg.auto;
+  const syncStatus = el('div',{class:'muted',style:{fontSize:'12px',margin:'8px 0'}});
+  function refreshSyncStatus(){
+    if(!RM.sync){ syncStatus.textContent='Modulo sync non disponibile.'; return; }
+    const s = RM.sync.status();
+    const last = s.syncedUpdatedAt ? new Date(s.syncedUpdatedAt).toLocaleString('it-IT') : 'mai';
+    syncStatus.textContent = `${s.hasToken?'✓ token impostato':'✗ token mancante'} · ${s.gistId?('gist '+s.gistId.slice(0,8)+'…'):'gist non ancora creato'} · auto ${s.auto?'ON':'OFF'} · ultima sync: ${last}`;
+  }
+  refreshSyncStatus();
+  async function runSync(kind){
+    if(!RM.sync){ toast('Modulo sync non disponibile','err'); return; }
+    try{
+      if(kind==='save'){ const v=fToken.value.trim(); if(!v){ toast('Incolla il token','err'); return; } RM.sync.cfg.token=v; fToken.value=''; fToken.placeholder='token già impostato — incolla per sostituirlo'; toast('Token salvato','ok'); refreshSyncStatus(); return; }
+      if(!RM.sync.cfg.token){ toast('Salva prima il token','err'); return; }
+      if(kind==='push'){ await RM.sync.push(); toast('Dati inviati in cloud','ok'); refreshSyncStatus(); }
+      else if(kind==='pull'){
+        if(!await confirmDialog('Scaricare i dati dal cloud e SOSTITUIRE quelli su questo dispositivo? Consigliato la prima volta su telefono/PC secondari.','Scarica')) return;
+        await RM.sync.pull(); toast('Dati scaricati — ricarico…','ok'); setTimeout(()=>location.reload(),600);
+      }
+      else { const r=await RM.sync.syncNow(); toast(r.pulled?'Scaricato dal cloud — ricarico…':r.pushed?'Inviato in cloud':'Già sincronizzato','ok'); if(r.pulled){ setTimeout(()=>location.reload(),600); return; } refreshSyncStatus(); }
+    }catch(e){ toast('Sync fallita: '+e.message,'err'); }
+  }
+  fAuto.addEventListener('change',()=>{ if(RM.sync){ RM.sync.cfg.auto=fAuto.checked; refreshSyncStatus(); toast('Sync automatica '+(fAuto.checked?'attivata':'disattivata'),'ok'); } });
+
   root.innerHTML='';
   root.append(
     el('div',{class:'view-head'},[el('h1',{text:'Impostazioni'})]),
@@ -216,6 +242,28 @@ function mount(root){
       el('label',{class:'row',style:{gap:'8px',alignItems:'center',cursor:'pointer',margin:'8px 0'}},[
         fMove, el('span',{text:'Svuota il ristorante di origine dopo lo spostamento (altrimenti resta una copia)'}) ]),
       el('button',{class:'btn btn-primary',text:'Trasferisci dati',onclick:doTransfer}),
+    ]),
+    el('div',{class:'card',style:{marginTop:'14px'}},[
+      el('h2',{text:'Sincronizzazione tra dispositivi'}),
+      el('p',{class:'muted',style:{marginBottom:'10px',fontSize:'12.5px'},text:'Salva la memoria (tutti i ristoranti) in un Gist segreto del tuo account GitHub, per ritrovarla su telefono e PC. Serve un token con il solo permesso “gist”.'}),
+      el('ol',{class:'muted',style:{fontSize:'12px',margin:'0 0 12px 18px',lineHeight:'1.6'}},[
+        el('li',{},[ 'Crea il token qui: ',
+          el('a',{href:'https://github.com/settings/tokens/new?scopes=gist&description=Cambusa%20Sync',target:'_blank',rel:'noopener',style:{color:'var(--accent)',fontWeight:'600'},text:'github.com/settings/tokens'}),
+          ' (spunta solo “gist”), genera e copia.' ]),
+        el('li',{text:'Incollalo qui sotto → “Salva token”.'}),
+        el('li',{text:'Sul dispositivo che HA i dati premi “Invia”. Sugli altri premi “Scarica”. Poi attiva l’auto-sync.'}),
+      ]),
+      el('div',{class:'field'},[ el('label',{text:'Token GitHub (permesso gist)'}), fToken ]),
+      el('div',{class:'row wrap',style:{gap:'8px',margin:'8px 0'}},[
+        el('button',{class:'btn',text:'Salva token',onclick:()=>runSync('save')}),
+        el('button',{class:'btn btn-primary',text:'⇅ Sincronizza ora',onclick:()=>runSync('now')}),
+        el('button',{class:'btn',text:'⬆︎ Invia',onclick:()=>runSync('push')}),
+        el('button',{class:'btn',text:'⬇︎ Scarica',onclick:()=>runSync('pull')}),
+      ]),
+      el('label',{class:'row',style:{gap:'8px',alignItems:'center',cursor:'pointer',margin:'6px 0'}},[
+        fAuto, el('span',{text:'Sincronizza automaticamente (all’apertura e dopo ogni modifica)'}) ]),
+      syncStatus,
+      el('p',{class:'muted',style:{fontSize:'11px'},text:'Sicurezza: il token resta salvato in questo browser; usa un token con solo permesso “gist”, revocabile in ogni momento da GitHub. La sincronizzazione usa “vince l’ultima modifica”: se modifichi in contemporanea su due dispositivi, l’ultimo salvataggio prevale.'}),
     ]),
     el('div',{class:'row',style:{marginTop:'18px'}},[
       el('button',{class:'btn btn-primary',text:'Salva impostazioni',onclick:()=>{
