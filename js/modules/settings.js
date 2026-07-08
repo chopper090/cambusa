@@ -224,6 +224,20 @@ function mount(root){
       ]),
     ]),
     el('div',{class:'card',style:{marginTop:'14px'}},[
+      el('h2',{text:'Applicazione'}),
+      el('p',{class:'muted',style:{marginBottom:'12px',fontSize:'12.5px'},text:`Versione installata: ${RM.VERSION||'—'}. Se un aggiornamento non compare, forzalo qui (utile nelle app installate/wrapper che tengono la cache).`}),
+      el('button',{class:'btn',text:'⟳ Aggiorna app all\'ultima versione',onclick:async()=>{
+        try{
+          if('serviceWorker' in navigator){
+            const r = await navigator.serviceWorker.getRegistration();
+            if(r){ await r.update(); if(r.waiting) r.waiting.postMessage('skipWaiting'); }
+          }
+          toast('Cerco aggiornamenti — ricarico…','ok');
+        }catch(e){}
+        setTimeout(()=>location.reload(),900);
+      }}),
+    ]),
+    el('div',{class:'card',style:{marginTop:'14px'}},[
       el('h2',{text:'Menù della Carta'}),
       el('p',{class:'muted',style:{marginBottom:'12px',fontSize:'12.5px'},text:'Carica il menù completo (Piazzetta, Salse, Buns, Crostoni, Sfizi, Insalatine, Piatti, Signature) su questo ristorante. Aggiorna la categoria dei piatti già presenti e aggiunge quelli mancanti con ingredienti e allergeni. Non crea doppioni: puoi premerlo più volte in sicurezza.'}),
       el('button',{class:'btn btn-primary',text:'↧ Carica / aggiorna menù della Carta',onclick:async()=>{
