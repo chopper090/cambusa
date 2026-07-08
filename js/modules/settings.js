@@ -157,8 +157,10 @@ function mount(root){
   async function runSync(kind){
     if(!RM.sync){ toast('Modulo sync non disponibile','err'); return; }
     try{
-      if(kind==='save'){ const v=fToken.value.trim(); if(!v){ toast('Incolla il token','err'); return; } RM.sync.cfg.token=v; fToken.value=''; fToken.placeholder='token già impostato — incolla per sostituirlo'; toast('Token salvato','ok'); refreshSyncStatus(); return; }
+      if(kind==='save'){ const v=fToken.value.trim(); if(!v){ toast('Incolla il token','err'); return; } RM.sync.cfg.token=v; RM.sync.cfg.gistId=''; fToken.value=''; fToken.placeholder='token già impostato — incolla per sostituirlo'; toast('Token salvato','ok'); refreshSyncStatus(); return; }
+      if(kind==='clear'){ if(!await confirmDialog('Rimuovere il token salvato su questo dispositivo? I dati locali restano; dovrai reinserire il token per sincronizzare.','Rimuovi token')) return; RM.sync.clearToken(); toast('Token rimosso','ok'); refreshSyncStatus(); return; }
       if(!RM.sync.cfg.token){ toast('Salva prima il token','err'); return; }
+      if(kind==='verify'){ const v=await RM.sync.verify(); const sc = v.scopes==null ? 'permessi non leggibili dal browser' : ('permessi: '+(v.scopes.join(', ')||'nessuno')); const warn = v.hasGist===false ? ' — ⚠ MANCA il permesso “gist”!' : ''; toast(`Token valido · utente ${v.login} · ${sc}${warn}`, v.hasGist===false?'err':'ok'); return; }
       if(kind==='push'){ await RM.sync.push(); toast('Dati inviati in cloud','ok'); refreshSyncStatus(); }
       else if(kind==='pull'){
         if(!await confirmDialog('Scaricare i dati dal cloud e SOSTITUIRE quelli su questo dispositivo? Consigliato la prima volta su telefono/PC secondari.','Scarica')) return;
@@ -258,9 +260,11 @@ function mount(root){
       el('div',{class:'field'},[ el('label',{text:'Token GitHub (permesso gist)'}), fToken ]),
       el('div',{class:'row wrap',style:{gap:'8px',margin:'8px 0'}},[
         el('button',{class:'btn',text:'Salva token',onclick:()=>runSync('save')}),
+        el('button',{class:'btn',text:'🔎 Verifica',onclick:()=>runSync('verify')}),
         el('button',{class:'btn btn-primary',text:'⇅ Sincronizza ora',onclick:()=>runSync('now')}),
         el('button',{class:'btn',text:'⬆︎ Invia',onclick:()=>runSync('push')}),
         el('button',{class:'btn',text:'⬇︎ Scarica',onclick:()=>runSync('pull')}),
+        el('button',{class:'btn btn-ghost btn-sm',text:'Rimuovi token',onclick:()=>runSync('clear')}),
       ]),
       el('label',{class:'row',style:{gap:'8px',alignItems:'center',cursor:'pointer',margin:'6px 0'}},[
         fAuto, el('span',{text:'Sincronizza automaticamente (all’apertura e dopo ogni modifica)'}) ]),
