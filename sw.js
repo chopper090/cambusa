@@ -3,7 +3,7 @@
 // la cache è solo riserva offline). Le API GitHub non vengono intercettate.
 // Aggiorna CACHE_VERSION quando rilasci nuove versioni dell'app.
 
-const CACHE_VERSION = 'cambusa-v1.13.0';
+const CACHE_VERSION = 'cambusa-v1.13.1';
 const SHELL_CACHE  = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 

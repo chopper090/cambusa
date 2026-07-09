@@ -157,9 +157,12 @@ function mount(root){
   async function runSync(kind){
     if(!RM.sync){ toast('Modulo sync non disponibile','err'); return; }
     try{
-      if(kind==='save'){ const v=fToken.value.trim(); if(!v){ toast('Incolla il token','err'); return; } RM.sync.cfg.token=v; RM.sync.cfg.gistId=''; fToken.value=''; fToken.placeholder='token già impostato — incolla per sostituirlo'; toast('Token salvato','ok'); refreshSyncStatus(); return; }
-      if(kind==='clear'){ if(!await confirmDialog('Rimuovere il token salvato su questo dispositivo? I dati locali restano; dovrai reinserire il token per sincronizzare.','Rimuovi token')) return; RM.sync.clearToken(); toast('Token rimosso','ok'); refreshSyncStatus(); return; }
-      if(!RM.sync.cfg.token){ toast('Salva prima il token','err'); return; }
+      if(kind==='clear'){ if(!await confirmDialog('Rimuovere il token salvato su questo dispositivo? I dati locali restano; dovrai reinserire il token per sincronizzare.','Rimuovi token')) return; RM.sync.clearToken(); fToken.value=''; fToken.placeholder='ghp_… (token con permesso gist)'; toast('Token rimosso','ok'); refreshSyncStatus(); return; }
+      // qualsiasi azione salva PRIMA il token incollato nel campo (niente più trappola "dimenticato Salva")
+      const typed = fToken.value.trim();
+      if(typed){ RM.sync.cfg.token=typed; RM.sync.cfg.gistId=''; fToken.value=''; fToken.placeholder='token già impostato — incolla per sostituirlo'; refreshSyncStatus(); }
+      if(kind==='save'){ if(!typed && !RM.sync.cfg.token){ toast('Incolla il token','err'); return; } toast('Token salvato','ok'); refreshSyncStatus(); return; }
+      if(!RM.sync.cfg.token){ toast('Incolla il token e premi Salva token','err'); return; }
       if(kind==='verify'){ const v=await RM.sync.verify(); const sc = v.scopes==null ? 'permessi non leggibili dal browser' : ('permessi: '+(v.scopes.join(', ')||'nessuno')); const warn = v.hasGist===false ? ' — ⚠ MANCA il permesso “gist”!' : ''; toast(`Token valido · utente ${v.login} · ${sc}${warn}`, v.hasGist===false?'err':'ok'); return; }
       if(kind==='push'){ await RM.sync.push(); toast('Dati inviati in cloud','ok'); refreshSyncStatus(); }
       else if(kind==='pull'){
