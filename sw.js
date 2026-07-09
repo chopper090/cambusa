@@ -2,7 +2,7 @@
 // Strategia: app shell precaching (cache-first per i propri file) + network-first per le CDN esterne.
 // Aggiorna CACHE_VERSION quando rilasci nuove versioni dell'app.
 
-const CACHE_VERSION = 'cambusa-v1.12.4';
+const CACHE_VERSION = 'cambusa-v1.12.5';
 const SHELL_CACHE  = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 
@@ -62,6 +62,10 @@ self.addEventListener('fetch', (e)=>{
   const req = e.request;
   if(req.method !== 'GET') return;
   const url = new URL(req.url);
+
+  // API GitHub e contenuti raw: NON intercettare (passthrough diretto al browser),
+  // così non vengono messe in cache né mascherate da risposte "offline".
+  if(url.hostname==='api.github.com' || url.hostname.endsWith('githubusercontent.com')) return;
 
   // CDN librerie esterne → network-first con fallback cache
   if(url.origin !== location.origin){
