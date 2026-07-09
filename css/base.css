@@ -1,6 +1,11 @@
 *,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0;height:100%}
-html{color-scheme:light dark}
+/* Il color-scheme (controlli nativi: input, select, scrollbar, tendine) deve
+   seguire il TEMA dell'app, non il sistema operativo. Altrimenti su un dispositivo
+   con OS in scuro il tema "light" mostra sfondo chiaro ma campi/finestre native scure. */
+html{color-scheme:light dark}                       /* auto: segue l'OS */
+:root[data-theme="light"]{color-scheme:light}       /* tema chiaro forzato */
+:root[data-theme="dark"]{color-scheme:dark}         /* tema scuro forzato */
 body{
   font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   font-size:14px;line-height:1.5;color:var(--text);background:var(--bg);
