@@ -196,20 +196,26 @@ const store = {
   },
 
   // ===== Backup / ripristino dell'intero spazio di lavoro (tutti i ristoranti) =====
+  // ⚠️ La configurazione di sync (chiavi rm:v1:sync:* — token GitHub incluso) è
+  // ESCLUSA da backup e sync: il token non deve MAI finire nel Gist/file, altrimenti
+  // il secret-scanning di GitHub lo revoca. Ed è locale al dispositivo.
   backup(){
+    const SYNC = NS + 'sync:';
     const out = { _fmt:'cambusa-backup', _v:1, savedAt:Date.now(), app:structuredClone(appMeta), parts:{} };
     for(let i=0;i<localStorage.length;i++){
       const k = localStorage.key(i);
-      if(k && k.startsWith(NS) && k!==APP_KEY) out.parts[k] = localStorage.getItem(k);
+      if(k && k.startsWith(NS) && k!==APP_KEY && !k.startsWith(SYNC)) out.parts[k] = localStorage.getItem(k);
     }
     return out;
   },
   restore(obj){
     if(!obj || obj._fmt!=='cambusa-backup' || !obj.app || !Array.isArray(obj.app.restaurants)) return false;
+    const SYNC = NS + 'sync:';
     const del=[];
-    for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.startsWith(NS)) del.push(k); }
+    // non cancellare la config di sync locale (token) durante un ripristino/pull
+    for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.startsWith(NS) && !k.startsWith(SYNC)) del.push(k); }
     del.forEach(k=>localStorage.removeItem(k));
-    for(const k of Object.keys(obj.parts||{})) localStorage.setItem(k, obj.parts[k]);
+    for(const k of Object.keys(obj.parts||{})){ if(!k.startsWith(SYNC)) localStorage.setItem(k, obj.parts[k]); }
     appMeta = obj.app; writeApp(appMeta);
     notify('__app__'); for(const k of KEYS) notify(k);
     return true;
