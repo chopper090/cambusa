@@ -144,7 +144,14 @@ function mount(root){
   }
 
   // === Sincronizzazione (GitHub Gist) ===
-  const fToken = el('input',{type:'password',value:'',autocomplete:'off',placeholder: RM.sync?.cfg.token ? 'token già impostato — incolla per sostituirlo' : 'ghp_… (token con permesso gist)'});
+  // campo di tipo TEXT (non password) + anti-autofill: i gestori password riempivano
+  // il campo password e sovrascrivevano il token con spazzatura → 401.
+  const fToken = el('input',{type:'text',value:'',name:'cambusa-gist-token',id:'cambusa-gist-token',
+    autocomplete:'off',autocapitalize:'off',autocorrect:'off',spellcheck:false,
+    'data-1p-ignore':'true','data-lpignore':'true','data-bwignore':'true','data-form-type':'other',
+    placeholder: RM.sync?.cfg.token ? 'token già impostato — incolla per sostituirlo' : 'ghp_… (token con permesso gist)'});
+  // un token GitHub valido: ghp_/gho_/… + caratteri, oppure github_pat_…, o 40 hex (legacy)
+  const isTokenLike = v => /^(gh[opusr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|[0-9a-f]{40})$/.test(v);
   const fAuto  = el('input',{type:'checkbox'}); fAuto.checked = !!RM.sync?.cfg.auto;
   const syncStatus = el('div',{class:'muted',style:{fontSize:'12px',margin:'8px 0'}});
   function refreshSyncStatus(){
@@ -158,9 +165,13 @@ function mount(root){
     if(!RM.sync){ toast('Modulo sync non disponibile','err'); return; }
     try{
       if(kind==='clear'){ if(!await confirmDialog('Rimuovere il token salvato su questo dispositivo? I dati locali restano; dovrai reinserire il token per sincronizzare.','Rimuovi token')) return; RM.sync.clearToken(); fToken.value=''; fToken.placeholder='ghp_… (token con permesso gist)'; toast('Token rimosso','ok'); refreshSyncStatus(); return; }
-      // qualsiasi azione salva PRIMA il token incollato nel campo (niente più trappola "dimenticato Salva")
+      // qualsiasi azione salva PRIMA il token incollato nel campo — MA solo se somiglia a un
+      // vero token GitHub (così un eventuale autofill del gestore password non lo sovrascrive)
       const typed = fToken.value.trim();
-      if(typed){ RM.sync.cfg.token=typed; RM.sync.cfg.gistId=''; fToken.value=''; fToken.placeholder='token già impostato — incolla per sostituirlo'; refreshSyncStatus(); }
+      if(typed){
+        if(!isTokenLike(typed)){ toast('Il testo nel campo non è un token GitHub valido (deve iniziare con ghp_). Se è un riempimento automatico, cancellalo e incolla il token.','err'); return; }
+        RM.sync.cfg.token=typed; RM.sync.cfg.gistId=''; fToken.value=''; fToken.placeholder='token già impostato — incolla per sostituirlo'; refreshSyncStatus();
+      }
       if(kind==='save'){ if(!typed && !RM.sync.cfg.token){ toast('Incolla il token','err'); return; } toast('Token salvato','ok'); refreshSyncStatus(); return; }
       if(!RM.sync.cfg.token){ toast('Incolla il token e premi Salva token','err'); return; }
       if(kind==='verify'){ const v=await RM.sync.verify(); const sc = v.scopes==null ? 'permessi non leggibili dal browser' : ('permessi: '+(v.scopes.join(', ')||'nessuno')); const warn = v.hasGist===false ? ' — ⚠ MANCA il permesso “gist”!' : ''; toast(`Token valido · utente ${v.login} · ${sc}${warn}`, v.hasGist===false?'err':'ok'); return; }
