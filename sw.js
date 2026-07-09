@@ -3,7 +3,7 @@
 // la cache è solo riserva offline). Le API GitHub non vengono intercettate.
 // Aggiorna CACHE_VERSION quando rilasci nuove versioni dell'app.
 
-const CACHE_VERSION = 'cambusa-v1.13.1';
+const CACHE_VERSION = 'cambusa-v1.13.2';
 const SHELL_CACHE  = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 
@@ -70,13 +70,16 @@ self.addEventListener('fetch', (e)=>{
 
   // TUTTO il resto → network-first: online carica SEMPRE l'ultima versione dalla
   // rete (niente più versioni "incollate"); la cache resta solo riserva offline.
-  e.respondWith(networkFirst(req, url.origin===location.origin ? SHELL_CACHE : RUNTIME_CACHE));
+  const sameOrigin = url.origin===location.origin;
+  e.respondWith(networkFirst(req, sameOrigin ? SHELL_CACHE : RUNTIME_CACHE, sameOrigin));
 });
 
-async function networkFirst(req, cacheName){
+async function networkFirst(req, cacheName, revalidate){
   const cache = await caches.open(cacheName);
   try{
-    const fresh = await fetch(req);
+    // revalidate=true: rivalida sempre col server (bypassa la cache HTTP di ~10min di
+    // GitHub Pages) → aggiornamenti immediati senza hard-refresh.
+    const fresh = await fetch(req, revalidate ? {cache:'no-cache'} : undefined);
     if(fresh && fresh.ok) cache.put(req, fresh.clone());
     return fresh;
   }catch(e){
