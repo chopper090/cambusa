@@ -1,8 +1,9 @@
 // Cambusa — Service Worker
-// Strategia: app shell precaching (cache-first per i propri file) + network-first per le CDN esterne.
+// Strategia: NETWORK-FIRST per tutto (online = sempre l'ultima versione dalla rete;
+// la cache è solo riserva offline). Le API GitHub non vengono intercettate.
 // Aggiorna CACHE_VERSION quando rilasci nuove versioni dell'app.
 
-const CACHE_VERSION = 'cambusa-v1.12.5';
+const CACHE_VERSION = 'cambusa-v1.13.0';
 const SHELL_CACHE  = CACHE_VERSION + '-shell';
 const RUNTIME_CACHE = CACHE_VERSION + '-runtime';
 
@@ -67,33 +68,10 @@ self.addEventListener('fetch', (e)=>{
   // così non vengono messe in cache né mascherate da risposte "offline".
   if(url.hostname==='api.github.com' || url.hostname.endsWith('githubusercontent.com')) return;
 
-  // CDN librerie esterne → network-first con fallback cache
-  if(url.origin !== location.origin){
-    e.respondWith(networkFirst(req, RUNTIME_CACHE));
-    return;
-  }
-
-  // App shell e file locali → cache-first
-  e.respondWith(cacheFirst(req, SHELL_CACHE));
+  // TUTTO il resto → network-first: online carica SEMPRE l'ultima versione dalla
+  // rete (niente più versioni "incollate"); la cache resta solo riserva offline.
+  e.respondWith(networkFirst(req, url.origin===location.origin ? SHELL_CACHE : RUNTIME_CACHE));
 });
-
-async function cacheFirst(req, cacheName){
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(req, {ignoreSearch:true});
-  if(cached) return cached;
-  try{
-    const fresh = await fetch(req);
-    if(fresh && fresh.ok) cache.put(req, fresh.clone());
-    return fresh;
-  }catch(e){
-    // fallback: index.html per request di navigazione (SPA-like)
-    if(req.mode === 'navigate'){
-      const fallback = await cache.match('./index.html');
-      if(fallback) return fallback;
-    }
-    return new Response('Offline', {status:503, statusText:'Offline'});
-  }
-}
 
 async function networkFirst(req, cacheName){
   const cache = await caches.open(cacheName);
@@ -102,8 +80,12 @@ async function networkFirst(req, cacheName){
     if(fresh && fresh.ok) cache.put(req, fresh.clone());
     return fresh;
   }catch(e){
-    const cached = await cache.match(req);
+    const cached = await cache.match(req, {ignoreSearch:true});
     if(cached) return cached;
+    if(req.mode === 'navigate'){
+      const fallback = await cache.match('./index.html');
+      if(fallback) return fallback;
+    }
     return new Response('Offline', {status:503, statusText:'Offline'});
   }
 }
