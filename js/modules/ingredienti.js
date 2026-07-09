@@ -6,9 +6,10 @@ const {el, toast, confirmDialog, openModal, ALLERGENI, CATEGORIE_INGR, UNITA} = 
 const {store, onChange} = RM;
 
 let off=null, root=null, q='', filterCat='', filterAlg='', filterTipo='';
+const selected = new Set();   // id ingredienti spuntati per l'assegnazione fornitore in massa
 
 function mount(r){ root=r; render(); off=onChange(k=>{ if(k==='ingredienti'||k==='fornitori') render(); }); }
-function unmount(){ off?.(); off=null; }
+function unmount(){ off?.(); off=null; selected.clear(); }
 
 function render(){
   const list = store.all('ingredienti');
@@ -36,14 +37,90 @@ function render(){
     ]),
     el('div',{class:'view-sub'},['Doppio prezzo: ', el('b',{text:'sicuro'}), ' = il tuo fornitore, ', el('b',{text:'medio'}), ' = stima nazionale supermercato.']),
     filterBar(),
+    bulkBar(forn),
     list.length===0
       ? el('div',{class:'tbl-wrap'},[ el('div',{class:'tbl-empty'},[
           el('h3',{text:'Nessun ingrediente'}),
           el('p',{class:'muted',text:'Aggiungi ingredienti qui o creali al volo quando inserisci un piatto.'}),
           el('div',{style:{marginTop:'12px'}},[ el('button',{class:'btn btn-primary',text:'+ Nuovo ingrediente',onclick:()=>edit(null)}) ])
         ])])
-      : table(filtered, fornMap, ingMap)
+      : table(filtered, forn, fornMap, ingMap)
   );
+}
+
+// Barra azioni in massa: compare quando spunti uno o più ingredienti.
+// Scegli un fornitore dalla tendina e lo assegni a tutti i selezionati in un colpo.
+function bulkBar(forn){
+  if(!selected.size) return null;
+  const sel = el('select',{style:{maxWidth:'240px'}});
+  sel.appendChild(el('option',{value:'',text:'— assegna fornitore… —',disabled:true,selected:true}));
+  for(const f of forn) sel.appendChild(el('option',{value:f.id,text:f.nome}));
+  if(forn.length) sel.appendChild(el('option',{value:'__none__',text:'✕ togli fornitore'}));
+  sel.appendChild(el('option',{value:'__new__',text:'+ nuovo fornitore…'}));
+  sel.addEventListener('change',()=>{
+    const v = sel.value; sel.selectedIndex = 0;
+    if(v==='__new__'){ quickForn(f=>applyBulk(f.id)); return; }
+    if(v==='__none__'){ applyBulk(''); return; }
+    if(v) applyBulk(v);
+  });
+  return el('div',{class:'row wrap between',style:{background:'var(--accent-soft)',border:'1px solid var(--accent)',borderRadius:'var(--radius)',padding:'8px 12px',marginBottom:'12px',alignItems:'center'}},[
+    el('div',{class:'row',style:{gap:'10px',alignItems:'center'}},[
+      el('b',{text:`${selected.size} selezionat${selected.size===1?'o':'i'}`}),
+      sel,
+    ]),
+    el('button',{class:'btn btn-ghost btn-sm',text:'Deseleziona',onclick:()=>{ selected.clear(); render(); }}),
+  ]);
+}
+
+// Assegna (o rimuove, con fid='') un fornitore a tutti gli ingredienti spuntati.
+function applyBulk(fid){
+  const ids = new Set(selected); selected.clear();   // svuota prima: il render conseguente nasconde la barra
+  const list = store.all('ingredienti');
+  let n = 0;
+  for(const ing of list){ if(ids.has(ing.id) && ing.tipo!=='preparazione'){ ing.fornitore_id = fid||''; n++; } }
+  store.set('ingredienti', list);   // un'unica notifica → un solo re-render
+  const fname = fid ? (store.get('fornitori',fid)?.nome||'fornitore') : 'nessun fornitore';
+  toast(`${n} ingredient${n===1?'e':'i'} → ${fname}`,'ok');
+}
+
+// Imposta il fornitore di un singolo ingrediente dalla tendina inline.
+function setForn(ingId, fid){
+  const ing = store.get('ingredienti', ingId); if(!ing) return;
+  if((ing.fornitore_id||'')===(fid||'')) return;
+  ing.fornitore_id = fid||''; store.upsert('ingredienti', ing);
+}
+
+// Creazione lampo di un fornitore (solo nome) senza lasciare la schermata Ingredienti.
+function quickForn(onCreated){
+  const fN = el('input',{type:'text',placeholder:'Es. Metro, Ortofrutta Rossi…',autocomplete:'off'});
+  const body = el('div',{},[ el('div',{class:'field'},[ el('label',{text:'Nome fornitore *'}), fN,
+    el('span',{class:'hint',text:'Lo ritrovi in anagrafica Fornitori per aggiungere contatti e telefono.'}) ]) ]);
+  const {close} = openModal({ title:'Nuovo fornitore', body, footer:[
+    el('button',{class:'btn',text:'Annulla',onclick:()=>close()}),
+    el('button',{class:'btn btn-primary',text:'Crea',onclick:save}),
+  ]});
+  function save(){
+    const nome = fN.value.trim(); if(!nome){ toast('Nome obbligatorio','err'); fN.focus(); return; }
+    const ex = store.all('fornitori').find(f=>(f.nome||'').toLowerCase()===nome.toLowerCase());
+    const f = ex || store.upsert('fornitori',{nome});
+    toast(ex?`"${f.nome}" esiste già`:'Fornitore creato','ok'); close(); onCreated && onCreated(f);
+  }
+  fN.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } });
+  setTimeout(()=>fN.focus(), 50);
+}
+
+// Tendina fornitore inline per una riga (assegnazione diretta, senza aprire la modifica).
+function fornRowSelect(forn, ing){
+  const sel = el('select',{style:{maxWidth:'160px',fontSize:'12px',padding:'4px 6px'}});
+  sel.appendChild(el('option',{value:'',text:'— nessuno —',selected:!ing.fornitore_id}));
+  for(const f of forn) sel.appendChild(el('option',{value:f.id,text:f.nome,selected:ing.fornitore_id===f.id}));
+  sel.appendChild(el('option',{value:'__new__',text:'+ nuovo…'}));
+  sel.addEventListener('change',()=>{
+    const v = sel.value;
+    if(v==='__new__'){ sel.value = ing.fornitore_id||''; quickForn(f=>setForn(ing.id,f.id)); return; }
+    setForn(ing.id, v);
+  });
+  return sel;
 }
 
 function filterBar(){
@@ -71,11 +148,20 @@ function displayPrice(i, ingMap, which){
   return which==='medio' ? i.prezzo_medio : i.prezzo_sicuro;
 }
 
-function table(list, fornMap, ingMap){
+function table(list, forn, fornMap, ingMap){
   const {fmtEur} = RM.utils;
+  const selectable = list.filter(i=>i.tipo!=='preparazione');   // le preparazioni non hanno fornitore
+  const allChecked = selectable.length>0 && selectable.every(i=>selected.has(i.id));
   const tb = el('div',{class:'tbl-wrap'});
   const t = el('table',{class:'tbl'});
+  const selAll = el('input',{type:'checkbox',title:'Seleziona tutti'}); selAll.checked = allChecked;
+  selAll.addEventListener('change',()=>{
+    if(selAll.checked) selectable.forEach(i=>selected.add(i.id));
+    else selectable.forEach(i=>selected.delete(i.id));
+    render();
+  });
   t.appendChild(el('thead',{},[ el('tr',{},[
+    el('th',{style:{width:'34px'}},[selAll]),
     el('th',{text:'Nome'}), el('th',{text:'Categoria'}), el('th',{text:'Unità'}),
     el('th',{class:'num',text:'€ sicuro'}), el('th',{class:'num',text:'€ medio'}),
     el('th',{text:'Fornitore'}), el('th',{text:'Allergeni'}), el('th',{class:'actions'}),
@@ -84,7 +170,13 @@ function table(list, fornMap, ingMap){
   for(const i of list){
     const isPrep = i.tipo==='preparazione';
     const algs = RM.calc.resolveAllergeni(i, ingMap).map(a=>el('span',{class:'badge',text:a}));
-    const row = el('tr',{},[
+    let cb = null;
+    if(!isPrep){
+      cb = el('input',{type:'checkbox'}); cb.checked = selected.has(i.id);
+      cb.addEventListener('change',()=>{ if(cb.checked) selected.add(i.id); else selected.delete(i.id); render(); });
+    }
+    const row = el('tr', selected.has(i.id)?{style:{background:'var(--accent-soft)'}}:{}, [
+      el('td',{},[ cb ]),
       el('td',{},[ el('div',{},[
         el('b',{text:i.nome||'—'}),
         isPrep? el('span',{class:'badge acc',style:{marginLeft:'6px',fontSize:'10px'},text:'preparazione'}) : null,
@@ -93,7 +185,7 @@ function table(list, fornMap, ingMap){
       el('td',{text:i.unita||'—'}),
       el('td',{class:'num',text:fmtEur(displayPrice(i,ingMap,'sicuro'))}),
       el('td',{class:'num muted',text:fmtEur(displayPrice(i,ingMap,'medio'))}),
-      el('td',{},[ i.fornitore_id && fornMap.get(i.fornitore_id) ? el('span',{class:'chip',text:fornMap.get(i.fornitore_id).nome}) : el('span',{class:'muted',text:'—'}) ]),
+      el('td',{},[ isPrep ? el('span',{class:'muted',text:'—'}) : fornRowSelect(forn, i) ]),
       el('td',{},[ el('div',{class:'chips'}, algs.length?algs:[el('span',{class:'muted',text:'—'})]) ]),
       el('td',{class:'actions'},[
         el('button',{class:'btn btn-sm',text:'Modifica',onclick:()=>edit(i.id)}),
