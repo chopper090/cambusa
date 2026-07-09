@@ -6,6 +6,7 @@ const {el, toast, confirmDialog, openModal, ALLERGENI, CATEGORIE_INGR, UNITA} = 
 const {store, onChange} = RM;
 
 let off=null, root=null, q='', filterCat='', filterAlg='', filterTipo='';
+let sortKey='', sortDir=1;    // ordinamento tabella: '' = ordine di inserimento; dir 1=asc, -1=desc
 const selected = new Set();   // id ingredienti spuntati per l'assegnazione fornitore in massa
 
 function mount(r){ root=r; render(); off=onChange(k=>{ if(k==='ingredienti'||k==='fornitori') render(); }); }
