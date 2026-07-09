@@ -160,14 +160,37 @@ function table(list, forn, fornMap, ingMap){
     else selectable.forEach(i=>selected.delete(i.id));
     render();
   });
+  // intestazione cliccabile per ordinare (Nome, Categoria, prezzi); freccia = verso attivo
+  const sortTh = (label, key, numeric)=>{
+    const on = sortKey===key;
+    return el('th',{
+      class:numeric?'num':'', style:{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'},
+      title:'Clicca per ordinare', text: label+(on?(sortDir>0?' ▲':' ▼'):''),
+      onclick:()=>{ if(sortKey===key) sortDir=-sortDir; else { sortKey=key; sortDir=1; } render(); },
+    });
+  };
   t.appendChild(el('thead',{},[ el('tr',{},[
     el('th',{style:{width:'34px'}},[selAll]),
-    el('th',{text:'Nome'}), el('th',{text:'Categoria'}), el('th',{text:'Unità'}),
-    el('th',{class:'num',text:'€ sicuro'}), el('th',{class:'num',text:'€ medio'}),
+    sortTh('Nome','nome'), sortTh('Categoria','categoria'), el('th',{text:'Unità'}),
+    sortTh('€ sicuro','sicuro',true), sortTh('€ medio','medio',true),
     el('th',{text:'Fornitore'}), el('th',{text:'Allergeni'}), el('th',{class:'actions'}),
   ])]));
+
+  // applica l'ordinamento scelto (default = ordine di inserimento)
+  const rows = [...list];
+  if(sortKey){
+    const num = (i,which)=> Number(displayPrice(i,ingMap,which))||0;
+    const cmp = {
+      nome:(a,b)=>(a.nome||'').localeCompare(b.nome||'','it',{sensitivity:'base'}),
+      categoria:(a,b)=>(a.categoria||'').localeCompare(b.categoria||'','it',{sensitivity:'base'}),
+      sicuro:(a,b)=>num(a,'sicuro')-num(b,'sicuro'),
+      medio:(a,b)=>num(a,'medio')-num(b,'medio'),
+    }[sortKey];
+    if(cmp) rows.sort((a,b)=>sortDir*cmp(a,b));
+  }
+
   const tbody = el('tbody');
-  for(const i of list){
+  for(const i of rows){
     const isPrep = i.tipo==='preparazione';
     const algs = RM.calc.resolveAllergeni(i, ingMap).map(a=>el('span',{class:'badge',text:a}));
     let cb = null;
