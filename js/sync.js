@@ -41,7 +41,6 @@ async function ghFetch(url, opts={}){
     'Authorization':'Bearer '+cfg.token,
     'Accept':'application/vnd.github+json',
     'X-GitHub-Api-Version':'2022-11-28',
-    'Cache-Control':'no-cache',
     ...(opts.headers||{}),
   }});
   if(!res.ok){
@@ -117,7 +116,7 @@ async function pull(){
 async function verify(){
   if(!cfg.token) throw new Error('nessun token salvato su questo dispositivo');
   const res = await fetch(API+'/user?_ts='+Date.now(), {cache:'no-store', headers:{
-    'Authorization':'Bearer '+cfg.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28', 'Cache-Control':'no-cache' }});
+    'Authorization':'Bearer '+cfg.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' }});
   if(res.status===401) throw new Error('401 — il token salvato QUI non è valido. Probabilmente è ancora quello vecchio: reincollalo e premi “Salva token”.');
   if(!res.ok) throw new Error(res.status+' '+res.statusText);
   const u = await res.json();
