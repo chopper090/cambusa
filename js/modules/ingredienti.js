@@ -12,12 +12,9 @@ const selected = new Set();   // id ingredienti spuntati per l'assegnazione forn
 function mount(r){ root=r; render(); off=onChange(k=>{ if(k==='ingredienti'||k==='fornitori') render(); }); }
 function unmount(){ off?.(); off=null; selected.clear(); }
 
-function render(){
-  const list = store.all('ingredienti');
-  const forn = store.all('fornitori');
-  const fornMap = new Map(forn.map(f=>[f.id,f]));
-  const ingMap = new Map(list.map(i=>[i.id,i]));
-  const filtered = list.filter(i=>{
+// Filtro + ordinamento correnti applicati alla lista (condiviso da tabella ed export PDF).
+function filteredSorted(list, ingMap){
+  let out = list.filter(i=>{
     if(q && !(i.nome||'').toLowerCase().includes(q.toLowerCase())) return false;
     if(filterCat && i.categoria!==filterCat) return false;
     if(filterTipo==='preparazione' && i.tipo!=='preparazione') return false;
@@ -25,6 +22,25 @@ function render(){
     if(filterAlg && !RM.calc.resolveAllergeni(i, ingMap).includes(filterAlg)) return false;
     return true;
   });
+  if(sortKey){
+    const num = (i,which)=> Number(displayPrice(i,ingMap,which))||0;
+    const cmp = {
+      nome:(a,b)=>(a.nome||'').localeCompare(b.nome||'','it',{sensitivity:'base'}),
+      categoria:(a,b)=>(a.categoria||'').localeCompare(b.categoria||'','it',{sensitivity:'base'}),
+      sicuro:(a,b)=>num(a,'sicuro')-num(b,'sicuro'),
+      medio:(a,b)=>num(a,'medio')-num(b,'medio'),
+    }[sortKey];
+    if(cmp) out = [...out].sort((a,b)=>sortDir*cmp(a,b));
+  }
+  return out;
+}
+
+function render(){
+  const list = store.all('ingredienti');
+  const forn = store.all('fornitori');
+  const fornMap = new Map(forn.map(f=>[f.id,f]));
+  const ingMap = new Map(list.map(i=>[i.id,i]));
+  const filtered = filteredSorted(list, ingMap);
   root.innerHTML = '';
   root.append(
     el('div',{class:'view-head'},[
@@ -32,6 +48,14 @@ function render(){
       el('div',{class:'actions'},[
         el('div',{class:'search'},[ el('input',{type:'text',placeholder:'Cerca ingrediente…',value:q,oninput:e=>{q=e.target.value;render();}}) ]),
         el('button',{class:'btn',text:'📖 Catalogo base',title:'Importa dagli ingredienti base con prezzo GDO stimato',onclick:()=>catalogo()}),
+        el('button',{class:'btn',text:'🧹 Pulizia',title:'Trova e unisci doppioni e refusi',onclick:()=>pulizia()}),
+        el('button',{class:'btn',text:'📄 PDF',title:'Esporta la lista (così come filtrata/ordinata) in PDF per il fornitore',onclick:()=>{
+          const l = store.all('ingredienti'); const im = new Map(l.map(i=>[i.id,i]));
+          const sub = [ filterCat&&('cat.: '+filterCat), filterTipo==='semplice'&&'solo materie prime',
+                        filterTipo==='preparazione'&&'solo preparazioni', filterAlg&&('allergene: '+filterAlg),
+                        q&&('ricerca: “'+q+'”') ].filter(Boolean).join('  ·  ');
+          RM.pdf.esportaIngredienti(filteredSorted(l, im), {subtitle: sub});
+        }}),
         el('button',{class:'btn',text:'+ Nuova preparazione',title:'Crea una ricetta/base composta da zero',onclick:()=>edit(null,{tipo:'preparazione'})}),
         el('button',{class:'btn btn-primary',text:'+ Nuovo ingrediente',onclick:()=>edit(null)}),
       ])
@@ -177,21 +201,8 @@ function table(list, forn, fornMap, ingMap){
     el('th',{text:'Fornitore'}), el('th',{text:'Allergeni'}), el('th',{class:'actions'}),
   ])]));
 
-  // applica l'ordinamento scelto (default = ordine di inserimento)
-  const rows = [...list];
-  if(sortKey){
-    const num = (i,which)=> Number(displayPrice(i,ingMap,which))||0;
-    const cmp = {
-      nome:(a,b)=>(a.nome||'').localeCompare(b.nome||'','it',{sensitivity:'base'}),
-      categoria:(a,b)=>(a.categoria||'').localeCompare(b.categoria||'','it',{sensitivity:'base'}),
-      sicuro:(a,b)=>num(a,'sicuro')-num(b,'sicuro'),
-      medio:(a,b)=>num(a,'medio')-num(b,'medio'),
-    }[sortKey];
-    if(cmp) rows.sort((a,b)=>sortDir*cmp(a,b));
-  }
-
   const tbody = el('tbody');
-  for(const i of rows){
+  for(const i of list){
     const isPrep = i.tipo==='preparazione';
     const algs = RM.calc.resolveAllergeni(i, ingMap).map(a=>el('span',{class:'badge',text:a}));
     let cb = null;
@@ -620,5 +631,162 @@ function catalogo(){
   });
 }
 
-RM.modules.ingredienti = {mount, unmount, edit, createQuick, catalogo};
+// ============================================================================
+// Pulizia lista: trova doppioni e refusi (accenti, maiuscole, spazi, plurali,
+// poche lettere di differenza) e li unisce SOLO su conferma dell'utente,
+// spostando gli utilizzi (piatti e preparazioni) sull'ingrediente tenuto.
+// ============================================================================
+function normName(s){
+  return (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ').trim();
+}
+function lev(a,b){
+  const m=a.length, n=b.length;
+  if(!m) return n; if(!n) return m;
+  let prev=Array.from({length:n+1},(_,i)=>i), cur=new Array(n+1);
+  for(let i=1;i<=m;i++){
+    cur[0]=i;
+    for(let j=1;j<=n;j++){
+      const cost = a[i-1]===b[j-1]?0:1;
+      cur[j]=Math.min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost);
+    }
+    [prev,cur]=[cur,prev];
+  }
+  return prev[n];
+}
+// Union-find: raggruppa gli ingredienti simili. Restituisce solo i gruppi con >1 elemento.
+function buildClusters(list){
+  const n=list.length, norm=list.map(i=>normName(i.nome));
+  const parent=list.map((_,i)=>i);
+  const find=x=>{ while(parent[x]!==x){ parent[x]=parent[parent[x]]; x=parent[x]; } return x; };
+  const union=(a,b)=>{ parent[find(a)]=find(b); };
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
+    const a=norm[i], b=norm[j]; if(!a||!b) continue;
+    let match = a===b;
+    if(!match){
+      const minL=Math.min(a.length,b.length);
+      if(minL>=5 && a[0]===b[0] && lev(a,b)<=2) match=true;   // refusi/plurali, conservativo
+    }
+    if(match) union(i,j);
+  }
+  const map=new Map();
+  for(let i=0;i<n;i++){ const r=find(i); (map.get(r)||map.set(r,[]).get(r)).push(list[i]); }
+  return [...map.values()].filter(g=>g.length>1);
+}
+function usageCount(id, piatti, preps){
+  let c=0;
+  for(const p of piatti) if((p.ingredienti||[]).some(r=>r.ing_id===id)) c++;
+  for(const pr of preps) if((pr.sub||[]).some(r=>r.ing_id===id)) c++;
+  return c;
+}
+// Suggerisce quale tenere: più usato → con prezzo → con fornitore → nome più corto.
+function suggestKeep(group, piatti, preps){
+  return [...group].sort((a,b)=>{
+    const u=usageCount(b.id,piatti,preps)-usageCount(a.id,piatti,preps); if(u) return u;
+    const p=(Number(b.prezzo_sicuro)>0?1:0)-(Number(a.prezzo_sicuro)>0?1:0); if(p) return p;
+    const f=(b.fornitore_id?1:0)-(a.fornitore_id?1:0); if(f) return f;
+    return (a.nome||'').length-(b.nome||'').length;
+  })[0].id;
+}
+// Unisce otherIds dentro keepId: ripunta i riferimenti in piatti e preparazioni,
+// riempie i campi vuoti del tenuto, poi elimina gli altri.
+function mergeInto(keepId, otherIds){
+  const others = new Set(otherIds);
+  const repoint = rows => {
+    let changed=false; const seen=new Set(); const out=[];
+    for(const r of (rows||[])){
+      const id = others.has(r.ing_id) ? keepId : r.ing_id;
+      if(id!==r.ing_id) changed=true;
+      if(seen.has(id)){ changed=true; continue; }   // evita doppia riga dello stesso ingrediente
+      seen.add(id); out.push(id===r.ing_id?r:{...r, ing_id:id});
+    }
+    return {changed, out};
+  };
+  for(const p of store.all('piatti')){
+    const {changed,out}=repoint(p.ingredienti);
+    if(changed){ p.ingredienti=out; store.upsert('piatti', p); }
+  }
+  for(const ing of store.all('ingredienti')){
+    if(ing.tipo!=='preparazione' || !Array.isArray(ing.sub)) continue;
+    const {changed,out}=repoint(ing.sub);
+    if(changed){ ing.sub=out; store.upsert('ingredienti', ing); }
+  }
+  const keep = store.get('ingredienti', keepId);
+  if(keep){
+    for(const oid of otherIds){
+      const o = store.get('ingredienti', oid); if(!o) continue;
+      if(!keep.fornitore_id && o.fornitore_id) keep.fornitore_id=o.fornitore_id;
+      if(!(Number(keep.prezzo_sicuro)>0) && Number(o.prezzo_sicuro)>0) keep.prezzo_sicuro=o.prezzo_sicuro;
+      if(!(Number(keep.prezzo_medio)>0)  && Number(o.prezzo_medio)>0)  keep.prezzo_medio =o.prezzo_medio;
+      if(!keep.categoria && o.categoria) keep.categoria=o.categoria;
+      const ka=new Set(keep.allergeni||[]); (o.allergeni||[]).forEach(a=>ka.add(a)); keep.allergeni=[...ka];
+    }
+    store.upsert('ingredienti', keep);
+  }
+  for(const oid of otherIds) store.remove('ingredienti', oid);
+}
+
+function pulizia(){
+  const list = store.all('ingredienti');
+  const piatti = store.all('piatti');
+  const preps = list.filter(i=>i.tipo==='preparazione');
+  const fornMap = new Map(store.all('fornitori').map(f=>[f.id,f]));
+  const clusters = buildClusters(list);
+  const state = clusters.map(g=>({keepId:suggestKeep(g,piatti,preps), skip:false}));
+
+  const body = el('div',{});
+  body.appendChild(el('p',{class:'muted',style:{fontSize:'13px',marginBottom:'12px'},
+    html:'Ho analizzato tutti i nomi e raggruppato i <b>probabili doppioni e refusi</b> (accenti, maiuscole, spazi, singolare/plurale, poche lettere di differenza). Per ogni gruppo scegli <b>quale tenere</b>: gli altri vengono uniti a quello e i loro utilizzi nei piatti e nelle preparazioni <b>spostati automaticamente</b>. Niente viene eliminato senza la tua conferma qui. Spunta <b>“salta”</b> se un gruppo non è un vero doppione.'}));
+
+  if(!clusters.length){
+    body.appendChild(el('div',{class:'drop',text:'Nessun doppione evidente trovato. La lista è già pulita 🎉'}));
+  }
+  const cards = el('div',{class:'list'});
+  clusters.forEach((g,idx)=>{
+    const card = el('div',{class:'card',style:{padding:'10px',marginBottom:'8px'}});
+    const skipCb = el('input',{type:'checkbox'});
+    skipCb.addEventListener('change',()=>{ state[idx].skip=skipCb.checked; card.style.opacity=skipCb.checked?0.45:1; });
+    card.appendChild(el('div',{class:'row between',style:{alignItems:'center',marginBottom:'4px'}},[
+      el('b',{text:`Gruppo ${idx+1} · ${g.length} simili`}),
+      el('label',{class:'row',style:{gap:'6px',fontSize:'12px',cursor:'pointer',alignItems:'center'}},[skipCb,'salta']),
+    ]));
+    card.appendChild(el('div',{class:'muted',style:{fontSize:'11px',marginBottom:'6px'},text:'Tieni:'}));
+    g.forEach(i=>{
+      const rb=el('input',{type:'radio',name:'clu_'+idx,value:i.id}); rb.checked = state[idx].keepId===i.id;
+      rb.addEventListener('change',()=>{ if(rb.checked) state[idx].keepId=i.id; });
+      const u = usageCount(i.id,piatti,preps);
+      const meta = [ i.tipo==='preparazione'?'preparazione':(i.categoria||'—'), i.unita||'',
+        Number(i.prezzo_sicuro)>0?RM.utils.fmtEur(i.prezzo_sicuro):'senza prezzo',
+        (i.fornitore_id&&fornMap.get(i.fornitore_id))?('→ '+fornMap.get(i.fornitore_id).nome):null,
+        `usato in ${u}` ].filter(Boolean).join(' · ');
+      card.appendChild(el('label',{class:'list-item',style:{cursor:'pointer',gap:'10px',alignItems:'center'}},[
+        rb, el('div',{class:'grow'},[ el('div',{class:'title',text:i.nome||'—'}), el('div',{class:'sub',text:meta}) ])
+      ]));
+    });
+    cards.appendChild(card);
+  });
+  body.appendChild(cards);
+
+  const {close} = openModal({
+    large:true, title:`Pulizia lista ingredienti${clusters.length?` (${clusters.length} gruppi)`:''}`, body,
+    footer:[
+      el('button',{class:'btn',text:'Chiudi',onclick:()=>close()}),
+      clusters.length ? el('button',{class:'btn btn-primary',text:'Unisci i gruppi',onclick:()=>{
+        let merged=0, removed=0;
+        clusters.forEach((g,idx)=>{
+          if(state[idx].skip) return;
+          const keepId = state[idx].keepId;
+          const otherIds = g.filter(i=>i.id!==keepId).map(i=>i.id);
+          if(!otherIds.length) return;
+          mergeInto(keepId, otherIds);
+          merged++; removed+=otherIds.length;
+        });
+        toast(merged?`${removed} doppioni uniti in ${merged} grupp${merged===1?'o':'i'}`:'Nessun gruppo da unire (tutti saltati)', merged?'ok':'err');
+        close();
+      }}) : null,
+    ]
+  });
+}
+
+RM.modules.ingredienti = {mount, unmount, edit, createQuick, catalogo, pulizia};
 })();
