@@ -7,7 +7,8 @@ const {store, onChange} = RM;
 
 let off=null, root=null, q='', filterCat='', filterAlg='', filterTipo='';
 let sortKey='', sortDir=1;    // ordinamento tabella: '' = ordine di inserimento; dir 1=asc, -1=desc
-const selected = new Set();   // id ingredienti spuntati per l'assegnazione fornitore in massa
+let bulkAction='fornitore';   // azione corrente della barra "modifica in blocco"
+const selected = new Set();   // id ingredienti spuntati per la modifica in blocco
 
 function mount(r){ root=r; render(); off=onChange(k=>{ if(k==='ingredienti'||k==='fornitori') render(); }); }
 function unmount(){ off?.(); off=null; selected.clear(); }
@@ -67,47 +68,115 @@ function render(){
   );
 }
 
-// Barra azioni in massa: compare quando spunti uno o più ingredienti.
-// Scegli un fornitore dalla tendina e lo assegni a tutti i selezionati in un colpo.
+// Barra "modifica in blocco": compare quando spunti uno o più ingredienti.
+// Scegli COSA modificare (fornitore, categoria, unità, prezzi, elimina) e il
+// controllo giusto appare accanto. Le modifiche mantengono la selezione, così
+// puoi applicare più cambi allo stesso blocco; l'eliminazione la azzera.
 function bulkBar(forn){
   if(!selected.size) return null;
-  const sel = el('select',{style:{maxWidth:'240px'}});
-  sel.appendChild(el('option',{value:'',text:'— assegna fornitore… —',disabled:true,selected:true}));
-  for(const f of forn) sel.appendChild(el('option',{value:f.id,text:f.nome}));
-  if(forn.length) sel.appendChild(el('option',{value:'__none__',text:'✕ togli fornitore'}));
-  sel.appendChild(el('option',{value:'__new__',text:'+ nuovo fornitore…'}));
-  sel.addEventListener('change',()=>{
-    const v = sel.value; sel.selectedIndex = 0;
-    if(v==='__new__'){ quickForn(f=>applyBulk(f.id)); return; }
-    if(v==='__none__'){ applyBulk(''); return; }
-    if(v) applyBulk(v);
-  });
+  const actions = [['fornitore','Fornitore'],['categoria','Categoria'],['unita','Unità'],
+                   ['prezzo_sicuro','Prezzo sicuro'],['prezzo_medio','Prezzo medio'],['elimina','Elimina']];
+  const actSel = el('select',{style:{maxWidth:'150px'}});
+  for(const [v,t] of actions) actSel.appendChild(el('option',{value:v,text:t,selected:bulkAction===v}));
+  actSel.addEventListener('change',()=>{ bulkAction=actSel.value; render(); });
+
+  const ctrl = el('div',{class:'row',style:{gap:'8px',alignItems:'center'}});
+  buildBulkControl(ctrl, forn);
+
   return el('div',{class:'row wrap between',style:{background:'var(--accent-soft)',border:'1px solid var(--accent)',borderRadius:'var(--radius)',padding:'8px 12px',marginBottom:'12px',alignItems:'center'}},[
-    el('div',{class:'row',style:{gap:'10px',alignItems:'center'}},[
+    el('div',{class:'row wrap',style:{gap:'10px',alignItems:'center'}},[
       el('b',{text:`${selected.size} selezionat${selected.size===1?'o':'i'}`}),
-      sel,
+      el('span',{class:'muted',style:{fontSize:'12px'},text:'modifica in blocco:'}),
+      actSel, ctrl,
     ]),
     el('button',{class:'btn btn-ghost btn-sm',text:'Deseleziona',onclick:()=>{ selected.clear(); render(); }}),
   ]);
 }
 
-// Assegna (o rimuove, con fid='') un fornitore a tutti gli ingredienti spuntati.
-function applyBulk(fid){
-  const ids = new Set(selected); selected.clear();   // svuota prima: il render conseguente nasconde la barra
-  const list = store.all('ingredienti');
-  let n = 0;
-  for(const ing of list){ if(ids.has(ing.id) && ing.tipo!=='preparazione'){ ing.fornitore_id = fid||''; n++; } }
-  store.set('ingredienti', list);   // un'unica notifica → un solo re-render
-  const fname = fid ? (store.get('fornitori',fid)?.nome||'fornitore') : 'nessun fornitore';
-  toast(`${n} ingredient${n===1?'e':'i'} → ${fname}`,'ok');
+// Costruisce il controllo contestuale in base all'azione scelta.
+function buildBulkControl(ctrl, forn){
+  if(bulkAction==='fornitore'){
+    const s = el('select',{style:{maxWidth:'220px'}});
+    s.appendChild(el('option',{value:'__',text:'— scegli fornitore… —',disabled:true,selected:true}));
+    for(const f of forn) s.appendChild(el('option',{value:f.id,text:f.nome}));
+    if(forn.length) s.appendChild(el('option',{value:'__none__',text:'✕ togli fornitore'}));
+    s.appendChild(el('option',{value:'__new__',text:'+ nuovo fornitore…'}));
+    s.addEventListener('change',()=>{ const v=s.value; s.selectedIndex=0;
+      if(v==='__new__') quickForn(f=>bulkApply('fornitore',f.id));
+      else if(v==='__none__') bulkApply('fornitore','');
+      else if(v && v!=='__') bulkApply('fornitore',v);
+    });
+    ctrl.append(s, el('span',{class:'muted',style:{fontSize:'11px'},text:'(le preparazioni non hanno fornitore)'}));
+  }
+  else if(bulkAction==='categoria'){
+    const s = el('select',{style:{maxWidth:'200px'}});
+    s.appendChild(el('option',{value:'__',text:'— scegli categoria… —',disabled:true,selected:true}));
+    s.appendChild(el('option',{value:'',text:'(nessuna)'}));
+    for(const c of CATEGORIE_INGR) s.appendChild(el('option',{value:c,text:c}));
+    s.addEventListener('change',()=>{ if(s.value!=='__') bulkApply('categoria', s.value); });
+    ctrl.append(s);
+  }
+  else if(bulkAction==='unita'){
+    const s = el('select',{style:{maxWidth:'120px'}});
+    s.appendChild(el('option',{value:'__',text:'— unità… —',disabled:true,selected:true}));
+    for(const u of UNITA) s.appendChild(el('option',{value:u,text:u}));
+    s.addEventListener('change',()=>{ if(s.value!=='__') bulkApply('unita', s.value); });
+    ctrl.append(s);
+  }
+  else if(bulkAction==='prezzo_sicuro' || bulkAction==='prezzo_medio'){
+    const inp = el('input',{type:'number',min:'0',step:'0.01',placeholder:'€/unità',style:{maxWidth:'110px'}});
+    const btn = el('button',{class:'btn btn-sm btn-primary',text:'Applica',onclick:()=>{
+      const val = parseFloat(inp.value);
+      if(isNaN(val) || val<0){ toast('Inserisci un prezzo valido','err'); inp.focus(); return; }
+      bulkApply(bulkAction, val);
+    }});
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); btn.click(); } });
+    ctrl.append(inp, el('span',{class:'muted',style:{fontSize:'12px'},text:'€/u'}), btn,
+      el('span',{class:'muted',style:{fontSize:'11px'},text:'(salta le preparazioni)'}));
+  }
+  else if(bulkAction==='elimina'){
+    ctrl.append(el('button',{class:'btn btn-sm btn-danger',text:`Elimina ${selected.size} selezionat${selected.size===1?'o':'i'}`,onclick:()=>bulkDelete()}));
+  }
 }
 
-// Imposta il fornitore di un singolo ingrediente dalla tendina inline.
-function setForn(ingId, fid){
-  const ing = store.get('ingredienti', ingId); if(!ing) return;
-  if((ing.fornitore_id||'')===(fid||'')) return;
-  ing.fornitore_id = fid||''; store.upsert('ingredienti', ing);
+// Applica una modifica a tutti gli spuntati. Mantiene la selezione (tranne elimina).
+function bulkApply(action, value){
+  const ids = new Set(selected); if(!ids.size) return;
+  const list = store.all('ingredienti');
+  let n=0, skipped=0;
+  for(const ing of list){
+    if(!ids.has(ing.id)) continue;
+    const isPrep = ing.tipo==='preparazione';
+    switch(action){
+      case 'fornitore':     if(isPrep){skipped++;break;} ing.fornitore_id = value||''; n++; break;
+      case 'categoria':     ing.categoria = value||''; n++; break;
+      case 'unita':         ing.unita = value; n++; break;
+      case 'prezzo_sicuro': if(isPrep){skipped++;break;} ing.prezzo_sicuro = value; n++; break;
+      case 'prezzo_medio':  if(isPrep){skipped++;break;} ing.prezzo_medio  = value; n++; break;
+    }
+  }
+  store.set('ingredienti', list);   // un'unica notifica → un solo re-render (selezione conservata)
+  const LBL = {fornitore:'fornitore',categoria:'categoria',unita:'unità',prezzo_sicuro:'prezzo sicuro',prezzo_medio:'prezzo medio'};
+  toast(`${LBL[action]||'campo'}: aggiornati ${n}${skipped?` · ${skipped} preparazioni saltate`:''}`, n?'ok':'err');
 }
+
+// Elimina in blocco (con conferma). Azzera la selezione.
+async function bulkDelete(){
+  const ids = [...selected]; if(!ids.length) return;
+  if(!await confirmDialog(`Eliminare ${ids.length} ingredienti selezionati? L'operazione non è reversibile.`,'Elimina')) return;
+  const idset = new Set(ids); selected.clear();
+  const list = store.all('ingredienti').filter(i=>!idset.has(i.id));
+  store.set('ingredienti', list);
+  toast(`${ids.length} ingredienti eliminati`,'ok');
+}
+
+// Imposta un singolo campo di un ingrediente dalle tendine inline (fornitore, categoria…).
+function setField(ingId, field, value){
+  const ing = store.get('ingredienti', ingId); if(!ing) return;
+  if((ing[field]??'')===(value??'')) return;
+  ing[field] = value; store.upsert('ingredienti', ing);
+}
+function setForn(ingId, fid){ setField(ingId, 'fornitore_id', fid||''); }
 
 // Creazione lampo di un fornitore (solo nome) senza lasciare la schermata Ingredienti.
 function quickForn(onCreated){
@@ -142,6 +211,15 @@ function fornRowSelect(forn, ing){
   return sel;
 }
 
+// Tendina categoria/tipologia inline per una riga (modifica diretta senza aprire la scheda).
+function catRowSelect(ing){
+  const sel = el('select',{style:{maxWidth:'150px',fontSize:'12px',padding:'4px 6px'}});
+  sel.appendChild(el('option',{value:'',text:'— nessuna —',selected:!ing.categoria}));
+  for(const c of CATEGORIE_INGR) sel.appendChild(el('option',{value:c,text:c,selected:ing.categoria===c}));
+  sel.addEventListener('change',()=>setField(ing.id,'categoria',sel.value));
+  return sel;
+}
+
 function filterBar(){
   const wrap = el('div',{class:'row wrap',style:{marginBottom:'12px'}});
   const tipo = el('select',{onchange:e=>{filterTipo=e.target.value;render();},style:{maxWidth:'170px'}});
@@ -169,7 +247,7 @@ function displayPrice(i, ingMap, which){
 
 function table(list, forn, fornMap, ingMap){
   const {fmtEur} = RM.utils;
-  const selectable = list.filter(i=>i.tipo!=='preparazione');   // le preparazioni non hanno fornitore
+  const selectable = list;   // ora la modifica in blocco vale per tutte le righe (anche preparazioni)
   const allChecked = selectable.length>0 && selectable.every(i=>selected.has(i.id));
   const tb = el('div',{class:'tbl-wrap'});
   const t = el('table',{class:'tbl'});
@@ -199,18 +277,15 @@ function table(list, forn, fornMap, ingMap){
   for(const i of list){
     const isPrep = i.tipo==='preparazione';
     const algs = RM.calc.resolveAllergeni(i, ingMap).map(a=>el('span',{class:'badge',text:a}));
-    let cb = null;
-    if(!isPrep){
-      cb = el('input',{type:'checkbox'}); cb.checked = selected.has(i.id);
-      cb.addEventListener('change',()=>{ if(cb.checked) selected.add(i.id); else selected.delete(i.id); render(); });
-    }
+    const cb = el('input',{type:'checkbox'}); cb.checked = selected.has(i.id);
+    cb.addEventListener('change',()=>{ if(cb.checked) selected.add(i.id); else selected.delete(i.id); render(); });
     const row = el('tr', selected.has(i.id)?{style:{background:'var(--accent-soft)'}}:{}, [
       el('td',{},[ cb ]),
       el('td',{},[ el('div',{},[
         el('b',{text:i.nome||'—'}),
         isPrep? el('span',{class:'badge acc',style:{marginLeft:'6px',fontSize:'10px'},text:'preparazione'}) : null,
         i.note?el('div',{class:'muted',style:{fontSize:'12px'},text:i.note}):null ]) ]),
-      el('td',{},[ i.categoria? el('span',{class:'chip',text:i.categoria}) : el('span',{class:'muted',text:'—'}) ]),
+      el('td',{},[ catRowSelect(i) ]),
       el('td',{text:i.unita||'—'}),
       el('td',{class:'num',text:fmtEur(displayPrice(i,ingMap,'sicuro'))}),
       el('td',{class:'num muted',text:fmtEur(displayPrice(i,ingMap,'medio'))}),
