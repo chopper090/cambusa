@@ -109,6 +109,65 @@ function drawPiattoPage(doc, p, ingMap, settings){
   drawFooter(doc, settings, 'ricettario');
 }
 
+// ===== Listino ingredienti (per il fornitore) =====
+// Riceve la lista già filtrata/ordinata dalla vista Ingredienti.
+function esportaIngredienti(list, opts={}){
+  const J = jspdf(); if(!J) return;
+  if(!list || !list.length){ toast('Nessun ingrediente da esportare','err'); return; }
+  const settings = store.getSettings();
+  const CATS = [...(RM.utils.CATEGORIE_INGR||[]), 'altro'];
+  const fornMap = new Map(store.all('fornitori').map(f=>[f.id,f]));
+  const groups = new Map(CATS.map(c=>[c,[]]));
+  for(const i of list){ const k = groups.has(i.categoria)?i.categoria:'altro'; groups.get(k).push(i); }
+
+  const doc = new J({unit:'mm',format:'a4'});
+  const LABEL = 'Listino ingredienti';
+  drawHeader(doc, settings, LABEL);
+  let y = 28;
+  doc.setFont('helvetica','bold').setFontSize(20).setTextColor(COL.text);
+  doc.text(LABEL, 20, y); y += 7;
+  doc.setFont('helvetica','normal').setFontSize(10).setTextColor(COL.muted);
+  const sub = [opts.subtitle, `${list.length} voci`, 'generato il '+fmtDate(Date.now())].filter(Boolean).join('  ·  ');
+  doc.text(wrap(doc, sub, 170), 20, y); y += 9;
+
+  const xName=20, xUni=112, xCur=155, xOffA=160, xOffB=189;
+  function tableHead(){
+    doc.setFont('helvetica','bold').setFontSize(7.5).setTextColor(COL.muted);
+    doc.text('INGREDIENTE', xName, y);
+    doc.text('U.M.', xUni, y);
+    doc.text('€/u ATTUALE', xCur, y, {align:'right'});
+    doc.text('€/u OFFERTA', (xOffA+xOffB)/2, y, {align:'center'});
+    doc.setDrawColor(COL.light).line(20, y+1.5, 190, y+1.5); y += 5;
+  }
+  function newPage(catLabel){ doc.addPage(); drawHeader(doc, settings, LABEL+(catLabel?(' · '+catLabel):'')); y=28; tableHead(); }
+
+  for(const cat of CATS){
+    const items = groups.get(cat); if(!items.length) continue;
+    if(y>258){ newPage(); }
+    doc.setFont('helvetica','bold').setFontSize(12).setTextColor(COL.text);
+    doc.text(cat.charAt(0).toUpperCase()+cat.slice(1), 20, y); y+=5;
+    tableHead();
+    for(const i of items){
+      doc.setFont('helvetica','normal').setFontSize(9.5);
+      const nameLines = wrap(doc, i.nome||'—', xUni-xName-4);
+      const rowH = Math.max(nameLines.length*4.4, 4.6) + 2.4;
+      if(y+rowH>282){ newPage(cat); }
+      doc.setTextColor(COL.text); doc.text(nameLines, xName, y);
+      doc.setTextColor(COL.muted); doc.text(i.unita||'—', xUni, y);
+      const price = Number(i.prezzo_sicuro)||0;
+      doc.text(price>0?fmtEur(price):'—', xCur, y, {align:'right'});
+      doc.setDrawColor(COL.light).line(xOffA, y+0.4, xOffB, y+0.4);   // riga vuota per il preventivo
+      y += rowH;
+      doc.setDrawColor('#eeeeee').line(20, y-1.2, 190, y-1.2);
+    }
+    y += 4;
+  }
+  drawFooter(doc, settings, null);   // solo numeri di pagina, niente filigrana
+  const stamp = new Date().toISOString().slice(0,10);
+  doc.save(`ingredienti_${stamp}.pdf`);
+  toast('Listino ingredienti PDF generato','ok');
+}
+
 // ===== Menù =====
 function esportaMenu(menuId){
   const J = jspdf(); if(!J) return;
@@ -377,5 +436,5 @@ function drawCover(doc, settings, title, sub){
   if(settings.indirizzo){ doc.setFontSize(9); doc.text(settings.indirizzo, 105, 280, {align:'center'}); }
 }
 
-RM.pdf = {esportaRicettario, esportaMenu, esportaHaccp, drawShape};
+RM.pdf = {esportaRicettario, esportaMenu, esportaHaccp, esportaIngredienti, drawShape};
 })();
