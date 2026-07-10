@@ -115,8 +115,7 @@ function esportaIngredienti(list, opts={}){
   const J = jspdf(); if(!J) return;
   if(!list || !list.length){ toast('Nessun ingrediente da esportare','err'); return; }
   const settings = store.getSettings();
-  const CATS = [...(RM.utils.CATEGORIE_INGR||[]), 'altro'];
-  const fornMap = new Map(store.all('fornitori').map(f=>[f.id,f]));
+  const CATS = (RM.utils.CATEGORIE_INGR||[]);   // include già 'altro' → niente sezione duplicata
   const groups = new Map(CATS.map(c=>[c,[]]));
   for(const i of list){ const k = groups.has(i.categoria)?i.categoria:'altro'; groups.get(k).push(i); }
 
@@ -147,20 +146,22 @@ function esportaIngredienti(list, opts={}){
     doc.setFont('helvetica','bold').setFontSize(12).setTextColor(COL.text);
     doc.text(cat.charAt(0).toUpperCase()+cat.slice(1), 20, y); y+=5;
     tableHead();
+    doc.setFont('helvetica','normal').setFontSize(9.5);
     for(const i of items){
-      doc.setFont('helvetica','normal').setFontSize(9.5);
       const nameLines = wrap(doc, i.nome||'—', xUni-xName-4);
-      const rowH = Math.max(nameLines.length*4.4, 4.6) + 2.4;
-      if(y+rowH>282){ newPage(cat); }
-      doc.setTextColor(COL.text); doc.text(nameLines, xName, y);
-      doc.setTextColor(COL.muted); doc.text(i.unita||'—', xUni, y);
+      const rowH = Math.max(nameLines.length*4.6, 5) + 2.6;
+      if(y+rowH>282){ newPage(cat); doc.setFont('helvetica','normal').setFontSize(9.5); }
+      const baseline = y + 4;
+      doc.setTextColor(COL.text);  doc.text(nameLines, xName, baseline);
+      doc.setTextColor(COL.muted); doc.text(i.unita||'—', xUni, baseline);
       const price = Number(i.prezzo_sicuro)||0;
-      doc.text(price>0?fmtEur(price):'—', xCur, y, {align:'right'});
-      doc.setDrawColor(COL.light).line(xOffA, y+0.4, xOffB, y+0.4);   // riga vuota per il preventivo
+      doc.text(price>0?fmtEur(price):'—', xCur, baseline, {align:'right'});
+      const sepY = y + rowH - 1;                                     // un'unica riga a fondo cella
+      doc.setDrawColor('#e8e8e8').line(20,   sepY, xCur+2, sepY);    // sotto nome/UM/attuale
+      doc.setDrawColor('#c0c0c0').line(xOffA, sepY, xOffB, sepY);    // campo €/u offerta da compilare
       y += rowH;
-      doc.setDrawColor('#eeeeee').line(20, y-1.2, 190, y-1.2);
     }
-    y += 4;
+    y += 6;
   }
   drawFooter(doc, settings, null);   // solo numeri di pagina, niente filigrana
   const stamp = new Date().toISOString().slice(0,10);

@@ -49,13 +49,7 @@ function render(){
         el('div',{class:'search'},[ el('input',{type:'text',placeholder:'Cerca ingrediente…',value:q,oninput:e=>{q=e.target.value;render();}}) ]),
         el('button',{class:'btn',text:'📖 Catalogo base',title:'Importa dagli ingredienti base con prezzo GDO stimato',onclick:()=>catalogo()}),
         el('button',{class:'btn',text:'🧹 Pulizia',title:'Trova e unisci doppioni e refusi',onclick:()=>pulizia()}),
-        el('button',{class:'btn',text:'📄 PDF',title:'Esporta la lista (così come filtrata/ordinata) in PDF per il fornitore',onclick:()=>{
-          const l = store.all('ingredienti'); const im = new Map(l.map(i=>[i.id,i]));
-          const sub = [ filterCat&&('cat.: '+filterCat), filterTipo==='semplice'&&'solo materie prime',
-                        filterTipo==='preparazione'&&'solo preparazioni', filterAlg&&('allergene: '+filterAlg),
-                        q&&('ricerca: “'+q+'”') ].filter(Boolean).join('  ·  ');
-          RM.pdf.esportaIngredienti(filteredSorted(l, im), {subtitle: sub});
-        }}),
+        el('button',{class:'btn',text:'📄 PDF',title:'Scegli le voci ed esporta il listino in PDF per il fornitore',onclick:()=>esportaPdfDialog()}),
         el('button',{class:'btn',text:'+ Nuova preparazione',title:'Crea una ricetta/base composta da zero',onclick:()=>edit(null,{tipo:'preparazione'})}),
         el('button',{class:'btn btn-primary',text:'+ Nuovo ingrediente',onclick:()=>edit(null)}),
       ])
@@ -627,6 +621,75 @@ function catalogo(){
         toast(n?`${n} ingredienti importati`:'Nessuna selezione', n?'ok':'err');
         if(n) close();
       }})
+    ]
+  });
+}
+
+// ============================================================================
+// Export PDF: prima fai scegliere quali voci stampare (per non inviare al
+// fornitore prodotti che non tratta). Parte dalla lista già filtrata/ordinata.
+// ============================================================================
+function esportaPdfDialog(){
+  const l0 = store.all('ingredienti'); const im = new Map(l0.map(i=>[i.id,i]));
+  const list = filteredSorted(l0, im);
+  if(!list.length){ toast('Nessun ingrediente da stampare','err'); return; }
+  const chosen = new Set(list.map(i=>i.id));   // default: tutte selezionate
+  const byCat = new Map();
+  for(const i of list){ const k = CATEGORIE_INGR.includes(i.categoria)?i.categoria:'altro'; (byCat.get(k)||byCat.set(k,[]).get(k)).push(i); }
+
+  const counter = el('span',{class:'muted',style:{fontSize:'12px'}});
+  const grid = el('div');
+  const upd = ()=>{ counter.textContent = `${chosen.size} di ${list.length} selezionate`; };
+  function draw(){
+    grid.innerHTML='';
+    for(const cat of CATEGORIE_INGR){
+      const items = byCat.get(cat); if(!items || !items.length) continue;
+      const allOn = items.every(i=>chosen.has(i.id));
+      const sec = el('div',{style:{marginBottom:'12px'}});
+      sec.appendChild(el('div',{class:'row between',style:{marginBottom:'4px',alignItems:'center'}},[
+        el('h4',{text:cat.charAt(0).toUpperCase()+cat.slice(1),style:{margin:0}}),
+        el('button',{class:'btn btn-sm btn-ghost',text:allOn?'deseleziona':'seleziona tutti',onclick:()=>{
+          items.forEach(i=>{ if(allOn) chosen.delete(i.id); else chosen.add(i.id); }); draw(); upd();
+        }}),
+      ]));
+      const box = el('div',{class:'list'});
+      for(const i of items){
+        const cb = el('input',{type:'checkbox'}); cb.checked = chosen.has(i.id);
+        cb.addEventListener('change',()=>{ if(cb.checked) chosen.add(i.id); else chosen.delete(i.id); upd(); });
+        const meta = [ i.unita||'', Number(i.prezzo_sicuro)>0?RM.utils.fmtEur(i.prezzo_sicuro):'senza prezzo',
+                       i.tipo==='preparazione'?'preparazione':null ].filter(Boolean).join(' · ');
+        box.appendChild(el('label',{class:'list-item',style:{cursor:'pointer',gap:'10px',alignItems:'center'}},[
+          cb, el('div',{class:'grow'},[ el('div',{class:'title',text:i.nome||'—'}), el('div',{class:'sub',text:meta}) ])
+        ]));
+      }
+      sec.appendChild(box); grid.appendChild(sec);
+    }
+  }
+  draw(); upd();
+
+  const body = el('div',{},[
+    el('p',{class:'muted',style:{fontSize:'12.5px',marginBottom:'10px'},text:'Spunta solo le voci da inviare al fornitore (escludi i prodotti che non tratta). Parte da tutto selezionato; puoi restringere ancora con i filtri della lista prima di aprire questa finestra.'}),
+    el('div',{class:'row between',style:{marginBottom:'10px',alignItems:'center'}},[
+      el('div',{class:'row',style:{gap:'8px'}},[
+        el('button',{class:'btn btn-sm',text:'Seleziona tutto',onclick:()=>{ list.forEach(i=>chosen.add(i.id)); draw(); upd(); }}),
+        el('button',{class:'btn btn-sm',text:'Deseleziona tutto',onclick:()=>{ chosen.clear(); draw(); upd(); }}),
+      ]),
+      counter,
+    ]),
+    grid,
+  ]);
+  const {close} = openModal({
+    large:true, title:'Stampa listino — scegli le voci', body,
+    footer:[
+      el('button',{class:'btn',text:'Annulla',onclick:()=>close()}),
+      el('button',{class:'btn btn-primary',text:'Genera PDF',onclick:()=>{
+        const out = list.filter(i=>chosen.has(i.id));
+        if(!out.length){ toast('Seleziona almeno una voce','err'); return; }
+        const sub = [ filterCat&&('cat.: '+filterCat), filterTipo==='semplice'&&'solo materie prime',
+                      filterTipo==='preparazione'&&'solo preparazioni', filterAlg&&('allergene: '+filterAlg),
+                      q&&('ricerca: “'+q+'”') ].filter(Boolean).join('  ·  ');
+        RM.pdf.esportaIngredienti(out, {subtitle: sub}); close();
+      }}),
     ]
   });
 }
